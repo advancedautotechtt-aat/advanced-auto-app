@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Advanced Auto | Workshop Pro</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root { --brand-red: #BE1E2D; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: white; margin: 0; display: flex; height: 100vh; flex-direction: column; overflow: hidden; }
+        
+        /* Layout */
+        @media (min-width: 1024px) { 
+            body { flex-direction: row; } 
+            .sidebar { width: 260px; height: 100vh; border-right: 1px solid #334155; display: flex !important; flex-direction: column; }
+            .mobile-nav { display: none; }
+        }
+
+        @media (max-width: 1023px) {
+            .sidebar { display: none; }
+            .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: #0f172a; border-top: 1px solid #334155; z-index: 1000; height: 65px; justify-content: space-around; align-items: center; }
+            .main-content { padding-bottom: 80px; }
+            .pdf-wrap { display: flex; justify-content: center; overflow-x: hidden; width: 100%; }
+            #pdf-area { transform: scale(0.42); transform-origin: top center; margin-bottom: -650px; flex-shrink: 0; }
+        }
+
+        .nav-btn { padding: 18px 25px; cursor: pointer; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-left: 4px solid transparent; }
+        .nav-btn.active { background: #1e293b; color: white; border-left-color: var(--brand-red); }
+        .main-content { flex-grow: 1; overflow-y: auto; background: #1e293b; scroll-behavior: smooth; }
+
+        /* Invoice UI */
+        #pdf-area { width: 8.5in; min-height: 11in; background: white; padding: 0.5in; color: #1e293b; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,0.5); }
+        .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
+        .w-desc  { width: 55%; }
+        .w-price { width: 15%; text-align: right; }
+        .w-qty   { width: 10%; text-align: center; }
+        .w-total { width: 20%; text-align: right; }
+        .pdf-table th { background: #0f172a; color: white; font-size: 8pt; padding: 12px 8px; text-transform: uppercase; border: none; }
+        .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 9pt; vertical-align: top; word-wrap: break-word; }
+        
+        .filter-tab { padding: 10px 20px; font-size: 10px; font-weight: 900; text-transform: uppercase; cursor: pointer; color: #64748b; border-bottom: 2px solid transparent; transition: 0.3s; }
+        .filter-tab.active { color: white; border-bottom-color: var(--brand-red); background: rgba(255,255,255,0.05); }
+
+        .suggestion-box { position: absolute; background: white; color: black; border: 1px solid #0f172a; width: 100%; z-index: 100; max-height: 200px; overflow-y: auto; border-radius: 8px; font-size: 11px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .footer-branding { width: 100%; height: 35px; background: var(--brand-red); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 8pt; margin-top: auto; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal.active { display: flex; }
+        .badge-quote { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
+        .badge-inv { background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar no-print bg-slate-900">
+        <div class="p-8"><h1 class="text-xl font-black italic text-white uppercase">Advanced <span class="text-red-600">Auto</span></h1></div>
+        <div onclick="showTab('dash')" class="nav-btn active" id="tab-dash">📋 Dashboard</div>
+        <div onclick="initNewDoc()" class="nav-btn">➕ New Job</div>
+        <div onclick="showTab('clients')" class="nav-btn" id="tab-clients">👥 Directory</div>
+        <div onclick="showTab('settings')" class="nav-btn" id="tab-settings">⚙️ Settings</div>
+    </div>
+
+    <div class="mobile-nav no-print">
+        <div onclick="showTab('dash')" class="text-center text-[10px] font-bold text-slate-400">📋<br>Dash</div>
+        <div onclick="initNewDoc()" class="text-center text-[10px] font-bold text-slate-400">➕<br>New</div>
+        <div onclick="showTab('clients')" class="text-center text-[10px] font-bold text-slate-400">👥<br>Fleet</div>
+        <div onclick="showTab('settings')" class="text-center text-[10px] font-bold text-slate-400">⚙️<br>Setup</div>
+    </div>
+
+    <div class="main-content">
+        <div id="view-dash" class="p-4 md:p-10 max-w-6xl mx-auto">
+             <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-slate-900 p-6 rounded-3xl border-l-4 border-emerald-500 shadow-xl">
+                    <p class="text-[10px] font-black text-slate-500 uppercase">Revenue (Invoiced)</p>
+                    <h3 id="stat-rev" class="text-2xl font-black text-white">$0.00</h3>
+                </div>
+                <div class="bg-slate-900 p-6 rounded-3xl border-l-4 border-amber-500 shadow-xl">
+                    <p class="text-[10px] font-black text-slate-500 uppercase">Quotes</p>
+                    <h3 id="stat-quote" class="text-2xl font-black text-white">$0.00</h3>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-3xl overflow-hidden shadow-2xl">
+                <div class="flex bg-slate-800/50 border-b border-slate-700">
+                    <div onclick="setDashFilter('ALL')" id="filt-ALL" class="filter-tab active">All Records</div>
+                    <div onclick="setDashFilter('INVOICE')" id="filt-INVOICE" class="filter-tab">Invoices Only</div>
+                    <div onclick="setDashFilter('QUOTE')" id="filt-QUOTE" class="filter-tab">Quotes Only</div>
+                </div>
+                <input type="text" id="dash-search" onkeyup="renderDashboard()" placeholder="Search Name, Reg or ID..." class="w-full bg-slate-800 p-5 outline-none border-b border-slate-700 text-white text-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs min-w-[500px]">
+                        <thead class="bg-slate-800 text-slate-500 font-black uppercase">
+                            <tr><th class="p-5">Type</th><th class="p-5">Date</th><th class="p-5">Client / Reg</th><th class="p-5 text-right">Total</th></tr>
+                        </thead>
+                        <tbody id="dash-list" class="divide-y divide-slate-800 text-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-editor" class="hidden">
+            <div class="no-print bg-slate-900 p-3 sticky top-0 z-50 flex flex-wrap justify-center gap-2 border-b border-slate-700">
+                <select id="doc-toggle" onchange="calc()" class="bg-slate-800 text-[10px] font-bold px-3 py-2 rounded-lg text-white">
+                    <option value="INVOICE">INVOICE</option><option value="QUOTE">QUOTE</option>
+                </select>
+                <button onclick="addRow()" class="bg-blue-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">+ Item</button>
+                <button onclick="openPayModal()" class="bg-emerald-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">Payment</button>
+                <button onclick="saveDoc()" class="bg-white text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase">Sync</button>
+                <button onclick="convertToInvoice()" id="convert-btn" class="bg-amber-500 text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase hidden">Convert</button>
+                <button onclick="deleteDoc()" id="del-btn" class="bg-red-900 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white hidden">Del</button>
+                <button onclick="downloadPDF()" class="bg-red-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">PDF</button>
+            </div>
+
+            <div class="pdf-wrap">
+                <div id="pdf-area">
+                    <div class="flex justify-between items-start mb-8">
+                        <div class="flex items-center gap-5">
+                            <img id="logo-img-display" src="" class="h-16 w-16 object-contain hidden">
+                            <div>
+                                <h1 id="brand-1-display" class="text-[20px] font-black uppercase tracking-tighter">ADVANCED AUTO</h1>
+                                <p id="brand-slogan-display" class="text-[8pt] font-bold text-red-600 uppercase italic"></p>
+                                <p id="brand-addr-display" class="text-[7pt] text-slate-500"></p>
+                                <p id="brand-contact-display" class="text-[8pt] font-black"></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <h1 id="doc-type-display" class="text-[30pt] font-black italic text-red-600 leading-none">INVOICE</h1>
+                            <p class="text-[9pt] font-bold">No: <span contenteditable="true" id="doc-id">---</span></p>
+                            <p class="text-[8pt] text-slate-400 font-bold uppercase">Date: <span contenteditable="true" id="doc-date-display"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-10 border-y-2 border-slate-900 py-6 mb-4">
+                        <div class="relative">
+                            <p class="text-[7pt] font-black text-slate-400 uppercase mb-1">Customer</p>
+                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="NAME" class="w-full font-black uppercase text-[12pt] border-none outline-none bg-transparent">
+                            <div id="s-name" class="suggestion-box hidden"></div>
+                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-500 text-[9pt]">PHONE</div>
+                        </div>
+                        <div class="text-right relative">
+                            <p class="text-[7pt] font-black text-slate-400 uppercase mb-1">Vehicle</p>
+                            <div class="font-bold text-[9pt]">Model: <span contenteditable="true" id="v-model" class="font-normal uppercase">---</span></div>
+                            <div class="font-bold text-[9pt]">Reg: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-normal text-red-600 uppercase">---</span></div>
+                            <div id="s-reg" class="suggestion-box hidden text-left right-0"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex-grow">
+                        <table class="pdf-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-desc">Description</th>
+                                    <th class="w-price">Price</th>
+                                    <th class="w-qty">Qty</th>
+                                    <th class="w-total">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rows-target"></tbody>
+                        </table>
+
+                        <div class="grid grid-cols-2 gap-4 mt-10">
+                            <div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
+                                <p class="text-[7pt] font-black uppercase text-slate-400 mb-1">Service Notes</p>
+                                <div contenteditable="true" id="job-notes" class="text-[8pt] outline-none min-h-[40px]">...</div>
+                            </div>
+                            <div class="flex justify-end">
+                                <div class="w-64 space-y-1">
+                                    <div class="flex justify-between text-slate-500 font-bold text-[9pt]"><span>Subtotal</span><span id="fin-sub">$0.00</span></div>
+                                    <div class="flex justify-between text-blue-600 font-bold text-[9pt]"><span>Discount</span><span>-$<span contenteditable="true" id="fin-disc-amt">0.00</span></span></div>
+                                    <div class="flex justify-between text-emerald-600 font-bold text-[9pt]"><span>Paid</span><span id="fin-paid">$0.00</span></div>
+                                    <div class="flex justify-between text-red-600 text-[18pt] font-black border-t-2 border-slate-900 pt-1"><span>DUE</span><span id="fin-due">$0.00</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="footer-branding uppercase tracking-widest italic">Advanced Auto • Reliable Excellence</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-clients" class="hidden max-w-6xl mx-auto p-4 md:p-10">
+            <h2 class="text-xl font-black uppercase text-slate-400 mb-6">Fleet Directory</h2>
+            <div id="client-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <div id="view-settings" class="hidden max-w-2xl mx-auto p-4 md:p-10">
+            <div class="bg-slate-900 p-6 rounded-3xl space-y-4 shadow-xl">
+                <h3 class="text-xs font-black uppercase text-red-500">Workshop Setup</h3>
+                <input type="text" id="set-n1" placeholder="Name" class="w-full bg-slate-800 p-4 rounded-xl text-white outline-none">
+                <input type="text" id="set-slogan" placeholder="Slogan" class="w-full bg-slate-800 p-4 rounded-xl text-white outline-none">
+                <input type="text" id="set-addr" placeholder="Address" class="w-full bg-slate-800 p-4 rounded-xl text-white outline-none">
+                <input type="text" id="set-ph" placeholder="Contact" class="w-full bg-slate-800 p-4 rounded-xl text-white outline-none">
+                <input type="file" onchange="handleLogoUpload(this)" class="block w-full text-xs text-slate-400">
+                <button onclick="saveSettings()" class="w-full bg-red-600 py-4 rounded-xl font-black uppercase">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pay-modal" class="modal">
+        <div class="bg-white text-slate-900 p-6 rounded-3xl w-full max-w-sm shadow-2xl">
+            <h3 class="font-black uppercase text-center mb-4 text-slate-400">Post Payment</h3>
+            <div id="modal-payment-list" class="mb-4 space-y-2 max-h-32 overflow-y-auto border-b pb-4 text-xs"></div>
+            <div class="space-y-3">
+                <input type="date" id="pay-date" class="w-full border p-3 rounded-xl font-bold bg-slate-50">
+                <input type="number" id="pay-val" placeholder="Amount" class="w-full border p-3 rounded-xl font-black bg-slate-50">
+                <select id="pay-method" class="w-full border p-3 rounded-xl font-black bg-slate-50">
+                    <option value="Cash">CASH</option><option value="Card">CARD</option><option value="Cheque">CHEQUE</option>
+                </select>
+                <button onclick="addPayment()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase">Post</button>
+                <button onclick="closeModal('pay-modal')" class="w-full text-slate-400 text-[10px] font-black uppercase pt-2">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="client-modal" class="modal">
+        <div class="bg-slate-900 p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div id="mc-content"></div>
+            <button onclick="closeModal('client-modal')" class="w-full mt-6 bg-slate-800 py-3 rounded-xl font-black text-white uppercase text-xs">Close Profile</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDmBG5zcJFfZW_oeDaAtnO09amq-BycRCk",
+            authDomain: "autotech-pro.firebaseapp.com",
+            databaseURL: "https://autotech-pro-default-rtdb.firebaseio.com",
+            projectId: "autotech-pro",
+            storageBucket: "autotech-pro.firebasestorage.app",
+            messagingSenderId: "565284746994",
+            appId: "1:565284746994:web:5d62fe269d4d6a038e826b"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const rdb = firebase.database();
+
+        let db = { docs: [], settings: {} };
+        let activePays = [];
+        let curLogo = "";
+        let currentFilter = 'ALL';
+
+        rdb.ref('autotech_data').on('value', (snap) => {
+            const val = snap.val();
+            db.docs = val && val.docs ? (Array.isArray(val.docs) ? val.docs : Object.values(val.docs)) : [];
+            db.settings = val && val.settings ? val.settings : {};
+            applySettings(); renderDashboard(); renderClients();
+        });
+
+        /* --- DASHBOARD LOGIC --- */
+        function setDashFilter(type) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('filt-' + type).classList.add('active');
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            const q = document.getElementById('dash-search').value.toLowerCase();
+            let rev = 0, qTot = 0;
+            db.docs.forEach(i => {
+                const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0;
+                if(i.type === 'INVOICE') rev += t; else qTot += t;
+            });
+            document.getElementById('stat-rev').innerText = fmt(rev);
+            document.getElementById('stat-quote').innerText = fmt(qTot);
+            const filtered = db.docs.slice().reverse().filter(i => {
+                const matchesType = (currentFilter === 'ALL' || i.type === currentFilter);
+                const matchesSearch = (i.client||'').toLowerCase().includes(q) || (i.reg||'').toLowerCase().includes(q) || (i.id||'').includes(q);
+                return matchesType && matchesSearch;
+            });
+            document.getElementById('dash-list').innerHTML = filtered.map(i => `<tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.id}')">
+                <td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td>
+                <td class="p-5 text-slate-400 text-[10px]">${i.date}</td>
+                <td class="p-5 font-bold uppercase">${i.client}<br><span class="text-red-500 text-[9px] font-black">${i.reg}</span></td>
+                <td class="p-5 text-right font-black">${i.total}</td>
+            </tr>`).join('');
+        }
+
+        /* --- EDITOR LOGIC --- */
+        function initNewDoc() {
+            activePays = []; 
+            document.getElementById('rows-target').innerHTML = '';
+            
+            // Generate highest ID + 1
+            let nextId = 1;
+            if (db.docs && db.docs.length > 0) {
+                const ids = db.docs.map(d => parseInt(d.id) || 0);
+                nextId = Math.max(...ids) + 1;
+            }
+            
+            document.getElementById('doc-id').innerText = nextId.toString().padStart(5, '0');
+            document.getElementById('doc-date-display').innerText = new Date().toLocaleDateString('en-GB');
+            document.getElementById('c-name').value = ''; 
+            document.getElementById('c-phone').innerText = 'PHONE';
+            document.getElementById('v-reg').innerText = '---';
+            document.getElementById('v-model').innerText = '---';
+            document.getElementById('job-notes').innerHTML = '...';
+            document.getElementById('fin-disc-amt').innerText = '0.00';
+            
+            document.getElementById('del-btn').classList.add('hidden');
+            document.getElementById('convert-btn').classList.add('hidden');
+            
+            addRow(); 
+            showTab('editor'); 
+            calc();
+        }
+
+        function addRow() {
+            const tr = document.createElement('tr');
+            tr.className = "row-obj";
+            tr.innerHTML = `<td class="w-desc"><div contenteditable="true" class="font-black uppercase">Service</div><div contenteditable="true" class="text-[7pt] text-slate-400 italic">Details...</div></td><td class="w-price"><span>$</span><span contenteditable="true" class="p-in">0.00</span></td><td class="w-qty" contenteditable="true"><span class="q-in">1</span></td><td class="w-total font-black l-in">$0.00</td>`;
+            document.getElementById('rows-target').appendChild(tr); calc();
+        }
+
+        function calc() {
+            let sub = 0;
+            document.querySelectorAll('.row-obj').forEach(r => {
+                const p = parseFloat(r.querySelector('.p-in').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+                const q = parseFloat(r.querySelector('.q-in').innerText) || 1;
+                sub += (p * q); r.querySelector('.l-in').innerText = fmt(p * q);
+            });
+            const disc = parseFloat(document.getElementById('fin-disc-amt').innerText) || 0;
+            const paid = activePays.reduce((a, b) => a + b.amt, 0);
+            document.getElementById('fin-sub').innerText = fmt(sub);
+            document.getElementById('fin-paid').innerText = fmt(paid);
+            document.getElementById('fin-due').innerText = fmt(sub - disc - paid);
+            document.getElementById('doc-type-display').innerText = document.getElementById('doc-toggle').value;
+        }
+
+        function saveDoc() {
+            const currentId = document.getElementById('doc-id').innerText;
+            const doc = {
+                id: currentId,
+                type: document.getElementById('doc-toggle').value,
+                date: document.getElementById('doc-date-display').innerText,
+                client: document.getElementById('c-name').value.toUpperCase(),
+                phone: document.getElementById('c-phone').innerText,
+                reg: document.getElementById('v-reg').innerText.toUpperCase(),
+                model: document.getElementById('v-model').innerText.toUpperCase(),
+                notes: document.getElementById('job-notes').innerHTML,
+                rows: document.getElementById('rows-target').innerHTML,
+                total: document.getElementById('fin-sub').innerText,
+                discount: document.getElementById('fin-disc-amt').innerText,
+                payments: activePays
+            };
+
+            if(!doc.client) return alert("Client name required");
+            let docs = [...db.docs];
+            const idx = docs.findIndex(x => x.id === currentId);
+            if(idx > -1) docs[idx] = doc; else docs.push(doc);
+            rdb.ref('autotech_data/docs').set(docs).then(() => { alert("Synced"); showTab('dash'); });
+        }
+
+        function loadDoc(id) {
+            const i = db.docs.find(x => x.id === id);
+            if(!i) return;
+            document.getElementById('doc-id').innerText = i.id;
+            document.getElementById('doc-date-display').innerText = i.date;
+            document.getElementById('doc-toggle').value = i.type;
+            document.getElementById('c-name').value = i.client;
+            document.getElementById('c-phone').innerText = i.phone;
+            document.getElementById('v-reg').innerText = i.reg;
+            document.getElementById('v-model').innerText = i.model;
+            document.getElementById('job-notes').innerHTML = i.notes;
+            document.getElementById('rows-target').innerHTML = i.rows;
+            document.getElementById('fin-disc-amt').innerText = i.discount || '0.00';
+            activePays = i.payments || [];
+            document.getElementById('convert-btn').classList.toggle('hidden', i.type === "INVOICE");
+            document.getElementById('del-btn').classList.remove('hidden');
+            showTab('editor'); calc();
+        }
+
+        /* --- FLEET / DIRECTORY LOGIC --- */
+        function renderClients() {
+            const clients = {};
+            db.docs.forEach(d => {
+                const name = (d.client || 'UNKNOWN').toUpperCase();
+                if(!clients[name]) clients[name] = { spend: 0, count: 0, vehicles: new Set() };
+                if(d.type === 'INVOICE') {
+                    clients[name].spend += (parseFloat(d.total.replace(/[^0-9.-]+/g,"")) || 0);
+                    clients[name].count++;
+                }
+                if(d.reg) clients[name].vehicles.add(d.reg.toUpperCase());
+            });
+
+            document.getElementById('client-grid').innerHTML = Object.entries(clients).map(([name, data]) => `
+                <div class="bg-slate-900 p-5 rounded-2xl cursor-pointer hover:bg-slate-800 border border-slate-800" onclick="viewClient('${name.replace(/'/g, "\\'")}')">
+                    <h4 class="font-black text-white uppercase text-sm mb-1">${name}</h4>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase mb-3">${data.vehicles.size} Vehicles</p>
+                    <div class="flex justify-between items-center border-t border-slate-800 pt-3">
+                        <span class="text-emerald-500 font-black text-sm">${fmt(data.spend)}</span>
+                        <span class="text-[8px] bg-slate-800 px-2 py-1 rounded text-slate-400 uppercase">${data.count} Visits</span>
+                    </div>
+                </div>`).join('');
+        }
+
+        function viewClient(name) {
+            const jobs = db.docs.filter(d => d.client.toUpperCase() === name);
+            const vehicles = {};
+            let totalSpend = 0;
+            jobs.forEach(j => {
+                const reg = (j.reg || 'NO-REG').toUpperCase();
+                if(!vehicles[reg]) vehicles[reg] = { model: j.model, jobs: [] };
+                vehicles[reg].jobs.push(j);
+                if(j.type === 'INVOICE') totalSpend += (parseFloat(j.total.replace(/[^0-9.-]+/g,"")) || 0);
+            });
+            document.getElementById('mc-content').innerHTML = `
+                <div class="flex justify-between items-start mb-6 border-b border-slate-800 pb-4">
+                    <div><h2 class="text-2xl font-black text-white uppercase">${name}</h2><p class="text-[10px] text-slate-500 uppercase">Fleet Profile</p></div>
+                    <div class="text-right"><p class="text-xl font-black text-emerald-500">${fmt(totalSpend)}</p></div>
+                </div>
+                <div class="space-y-6">${Object.entries(vehicles).map(([reg, v]) => `
+                        <div class="bg-slate-800/50 rounded-2xl overflow-hidden border border-slate-700">
+                            <div class="bg-slate-800 p-4 flex justify-between items-center">
+                                <div><span class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-black mr-2">${reg}</span><span class="text-white font-bold uppercase text-xs">${v.model}</span></div>
+                            </div>
+                            <div class="p-2 space-y-1">${v.jobs.sort((a,b) => b.id - a.id).map(j => `
+                                    <div class="flex justify-between items-center p-3 hover:bg-slate-700 rounded-lg cursor-pointer" onclick="closeModal('client-modal');loadDoc('${j.id}')">
+                                        <div class="flex items-center gap-3"><span class="${j.type==='QUOTE'?'badge-quote':'badge-inv'}">${j.type}</span><span class="text-slate-400 text-[10px] font-bold">${j.date}</span></div>
+                                        <b class="text-white text-xs">${j.total}</b>
+                                    </div>`).join('')}</div>
+                        </div>`).join('')}</div>`;
+            document.getElementById('client-modal').classList.add('active');
+        }
+
+        function showSuggestions(el, type) {
+            const val = el.value.toUpperCase().trim();
+            const box = document.getElementById(type === 'client' ? 's-name' : 's-reg');
+            if (val.length < 2) { box.classList.add('hidden'); return; }
+            const matches = db.docs.filter(d => (type === 'client' ? d.client : d.reg).toUpperCase().includes(val))
+                .reduce((acc, curr) => {
+                    const key = `${curr.client}-${curr.reg}`;
+                    if(!acc.find(x => `${x.client}-${x.reg}` === key)) acc.push(curr);
+                    return acc;
+                }, []);
+            if (matches.length > 0) {
+                box.innerHTML = matches.map(m => `
+                    <div class="p-3 border-b border-slate-100 cursor-pointer hover:bg-slate-50 flex justify-between" onclick="fillFromMemory('${m.id}')">
+                        <div><b class="text-slate-900">${m.client}</b></div>
+                        <div class="text-red-600 font-black">${m.reg}</div>
+                    </div>`).join('');
+                box.classList.remove('hidden');
+            } else box.classList.add('hidden');
+        }
+
+        function fillFromMemory(id) {
+            const m = db.docs.find(x => x.id === id);
+            document.getElementById('c-name').value = m.client;
+            document.getElementById('c-phone').innerText = m.phone;
+            document.getElementById('v-reg').innerText = m.reg;
+            document.getElementById('v-model').innerText = m.model;
+            document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
+        }
+
+        /* --- PAYMENTS --- */
+        function openPayModal() { document.getElementById('pay-date').value = new Date().toISOString().split('T')[0]; renderPayHistory(); document.getElementById('pay-modal').classList.add('active'); }
+        function addPayment() {
+            const v = parseFloat(document.getElementById('pay-val').value) || 0;
+            const d = document.getElementById('pay-date').value.split('-').reverse().join('/');
+            if(v > 0) { activePays.push({ amt: v, date: d, method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); calc(); }
+        }
+        function renderPayHistory() {
+            document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `
+                <div class="flex justify-between text-[10px] bg-slate-50 p-2 rounded">
+                    <span>${p.date} (${p.method})</span><b>${fmt(p.amt)}</b>
+                    <button onclick="activePays.splice(${idx},1);renderPayHistory();calc()">✕</button>
+                </div>`).join('');
+        }
+
+        /* --- UTILS --- */
+        function handleLogoUpload(input) {
+            const reader = new FileReader();
+            reader.onload = (e) => { curLogo = e.target.result; applySettings(); };
+            if(input.files[0]) reader.readAsDataURL(input.files[0]);
+        }
+        function saveSettings() {
+            const s = { n1: document.getElementById('set-n1').value, slogan: document.getElementById('set-slogan').value, addr: document.getElementById('set-addr').value, ph: document.getElementById('set-ph').value, logo: curLogo };
+            rdb.ref('autotech_data/settings').set(s).then(() => alert("Settings Saved"));
+        }
+        function applySettings() {
+            const s = db.settings || {};
+            document.getElementById('brand-1-display').innerText = s.n1 || 'ADVANCED AUTO';
+            document.getElementById('brand-slogan-display').innerText = s.slogan || '';
+            document.getElementById('brand-addr-display').innerText = s.addr || '';
+            document.getElementById('brand-contact-display').innerText = s.ph || '';
+            if(s.logo) { document.getElementById('logo-img-display').src = s.logo; document.getElementById('logo-img-display').classList.remove('hidden'); curLogo = s.logo; }
+            document.getElementById('set-n1').value = s.n1 || ''; document.getElementById('set-slogan').value = s.slogan || ''; document.getElementById('set-addr').value = s.addr || ''; document.getElementById('set-ph').value = s.ph || '';
+        }
+        function showTab(id) {
+            document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden'));
+            document.getElementById('view-' + id).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            if(document.getElementById('tab-'+id)) document.getElementById('tab-'+id).classList.add('active');
+        }
+        function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; calc(); }
+        function deleteDoc() { if(confirm("Delete this record permanently?")) { rdb.ref('autotech_data/docs').set(db.docs.filter(d => d.id !== document.getElementById('doc-id').innerText)).then(() => showTab('dash')); } }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
+        function downloadPDF() { html2pdf().from(document.getElementById('pdf-area')).save(`Job-${document.getElementById('doc-id').innerText}.pdf`); }
+        document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) calc(); });
+    </script>
+</body>
+</html>

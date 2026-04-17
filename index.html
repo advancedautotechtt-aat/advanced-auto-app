@@ -32,7 +32,18 @@
         .nav-btn.active { background: #1e293b; color: white; border-left-color: var(--brand-red); }
         .main-content { flex-grow: 1; overflow-y: auto; background: #1e293b; scroll-behavior: smooth; }
 
-        #pdf-area { width: 8.5in; min-height: 11in; background: white; padding: 0.5in; color: #1e293b; display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,0.5); position: relative;}
+        #pdf-area { 
+            width: 750px; 
+            min-height: 1000px; 
+            background: white; 
+            padding: 45px; 
+            color: #1e293b; 
+            display: flex; 
+            flex-direction: column; 
+            position: relative;
+            box-sizing: border-box;
+        }
+        
         .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
         .w-desc  { width: 50%; }
         .w-price { width: 15%; text-align: right; }
@@ -40,11 +51,11 @@
         .w-total { width: 20%; text-align: right; }
         .w-del   { width: 5%; text-align: center; }
         
-        .pdf-table th { background: #0f172a; color: white; font-size: 8pt; padding: 12px 8px; text-transform: uppercase; }
-        .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 9pt; vertical-align: top; word-wrap: break-word; line-height: 1.4; }
+        .pdf-table th { background: #0f172a; color: white; font-size: 10px; padding: 12px 8px; text-transform: uppercase; }
+        .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: top; word-wrap: break-word; line-height: 1.4; }
         
         .suggestion-box { position: absolute; background: white; color: black; border: 1px solid #0f172a; width: 280px; z-index: 5000; max-height: 250px; overflow-y: auto; border-radius: 8px; font-size: 11px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .footer-branding { width: 100%; height: 35px; background: var(--brand-red); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 8pt; margin-top: auto; }
+        .footer-branding { width: 100%; height: 35px; background: var(--brand-red); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; margin-top: auto; }
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal.active { display: flex; }
         .badge-quote { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
@@ -105,7 +116,7 @@
                 <button onclick="saveDoc()" class="bg-white text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase">Sync Cloud</button>
                 <button onclick="convertToInvoice()" id="convert-btn" class="bg-amber-500 text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase hidden">Convert to Inv</button>
                 <button onclick="deleteDoc()" id="del-btn" class="bg-red-900 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white hidden">Delete</button>
-                <button onclick="downloadPDF()" class="bg-red-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">PDF</button>
+                <button onclick="downloadPDF()" class="bg-red-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">Download PDF</button>
             </div>
 
             <div class="pdf-wrap">
@@ -114,31 +125,31 @@
                         <div class="flex items-center gap-5">
                             <img id="logo-img-display" src="" class="h-16 w-16 object-contain hidden">
                             <div>
-                                <h1 id="brand-1-display" class="text-[20px] font-black uppercase tracking-tighter">ADVANCED AUTO</h1>
-                                <p id="brand-slogan-display" class="text-[8pt] font-bold text-red-600 uppercase italic"></p>
-                                <p id="brand-addr-display" class="text-[7pt] text-slate-500"></p>
-                                <p id="brand-contact-display" class="text-[8pt] font-black"></p>
+                                <h1 id="brand-1-display" class="text-[20pt] font-black uppercase tracking-tighter">ADVANCED AUTO</h1>
+                                <p id="brand-slogan-display" class="text-[9pt] font-bold text-red-600 uppercase italic"></p>
+                                <p id="brand-addr-display" class="text-[8pt] text-slate-500"></p>
+                                <p id="brand-contact-display" class="text-[9pt] font-black"></p>
                             </div>
                         </div>
                         <div class="text-right">
                             <h1 id="doc-type-display" class="text-[28pt] font-black italic text-red-600 leading-none">INVOICE</h1>
-                            <p class="text-[9pt] font-bold">No: <span contenteditable="true" id="doc-id">---</span></p>
-                            <p class="text-[8pt] text-slate-400 font-bold uppercase">Date: <span contenteditable="true" id="doc-date-display"></span></p>
+                            <p class="text-[10pt] font-bold mt-2">No: <span contenteditable="true" id="doc-id">---</span></p>
+                            <p class="text-[9pt] text-slate-400 font-bold uppercase">Date: <span contenteditable="true" id="doc-date-display"></span></p>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-10 border-y-2 border-slate-900 py-6 mb-4">
                         <div class="relative">
-                            <p class="text-[7pt] font-black text-slate-400 uppercase mb-1">Customer</p>
-                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="NAME" class="w-full font-black uppercase text-[12pt] border-none outline-none bg-transparent">
+                            <p class="text-[8pt] font-black text-slate-400 uppercase mb-1">Customer Details</p>
+                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="CUSTOMER NAME" class="w-full font-black uppercase text-[13pt] border-none outline-none bg-transparent">
                             <div id="s-name" class="suggestion-box hidden"></div>
-                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-500 text-[9pt]">PHONE</div>
+                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-500 text-[10pt]">PHONE NO.</div>
                         </div>
                         <div class="text-right relative">
-                            <p class="text-[7pt] font-black text-slate-400 uppercase mb-1">Vehicle</p>
-                            <div class="font-bold text-[9pt]">Model: <span contenteditable="true" id="v-model" class="font-normal uppercase">---</span></div>
-                            <div class="font-bold text-[9pt]">Reg: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-normal text-red-600 uppercase">---</span></div>
-                            <div class="font-bold text-[9pt]">Mileage: <span contenteditable="true" id="v-mile" class="font-normal">0 km</span></div>
+                            <p class="text-[8pt] font-black text-slate-400 uppercase mb-1">Vehicle Information</p>
+                            <div class="font-bold text-[10pt]">Vehicle Make & Model: <span contenteditable="true" id="v-model" class="font-normal uppercase">---</span></div>
+                            <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-normal text-red-600 uppercase">---</span></div>
+                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" class="font-normal">0 km</span></div>
                             <div id="s-reg" class="suggestion-box hidden text-left right-0"></div>
                         </div>
                     </div>
@@ -157,21 +168,22 @@
                             <tbody id="rows-target"></tbody>
                         </table>
 
-                        <div class="grid grid-cols-2 gap-4 mt-10">
-                            <div class="bg-slate-50 p-4 rounded-xl border border-dashed border-slate-300">
-                                <p class="text-[7pt] font-black uppercase text-slate-400 mb-1">Service/Tech Notes</p>
-                                <div contenteditable="true" id="job-notes" class="text-[8pt] outline-none min-h-[40px]">...</div>
+                        <div class="grid grid-cols-2 gap-4 mt-6">
+                            <div class="bg-slate-50 p-3 rounded-xl border border-dashed border-slate-300 self-start">
+                                <p class="text-[8pt] font-black uppercase text-slate-400 mb-1">Service/Tech Notes</p>
+                                <div contenteditable="true" id="job-notes" class="text-[9pt] outline-none min-h-[40px]">...</div>
                             </div>
                             <div class="flex justify-end">
                                 <div class="w-64 space-y-1">
                                     <div class="flex justify-between text-slate-500 font-bold text-[9pt]"><span>Subtotal</span><span id="fin-sub">$0.00</span></div>
                                     <div class="flex justify-between text-blue-600 font-bold text-[9pt]"><span>Discount</span><span>-$<span contenteditable="true" id="fin-disc-amt">0.00</span></span></div>
-                                    <div class="flex justify-between text-emerald-600 font-bold text-[9pt]"><span>Paid</span><span id="fin-paid">$0.00</span></div>
-                                    <div class="flex justify-between text-red-600 text-[18pt] font-black border-t-2 border-slate-900 pt-1"><span>DUE</span><span id="fin-due">$0.00</span></div>
+                                    <div class="flex justify-between text-emerald-600 font-bold text-[9pt]"><span>Paid Amount</span><span id="fin-paid">$0.00</span></div>
+                                    <div class="flex justify-between text-red-600 text-[18pt] font-black border-t-2 border-slate-900 pt-1"><span>TOTAL DUE</span><span id="fin-due">$0.00</span></div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
                     <div class="footer-branding uppercase tracking-widest italic">Advanced Auto • Reliable Excellence</div>
                 </div>
             </div>
@@ -247,7 +259,6 @@
             applySettings(); renderDashboard(); renderClients(); renderInventoryList();
         });
 
-        /* RESTORED: Logo Logic */
         function handleLogoUpload(input) {
             const reader = new FileReader();
             reader.onload = (e) => { 
@@ -258,7 +269,6 @@
             if(input.files[0]) reader.readAsDataURL(input.files[0]);
         }
 
-        /* DB LOGIC */
         function saveInventory() {
             const idx = parseInt(document.getElementById('inv-edit-idx').value);
             const name = document.getElementById('inv-name').value.trim();
@@ -296,13 +306,12 @@
 
         function deleteInv(idx) { if(confirm("Delete?")) { const updated = db.inventory.filter((_, i) => i !== idx); rdb.ref('autotech_data/inventory').set(updated); } }
 
-        /* EDITOR & DASHBOARD */
         function initNewDoc() {
             activePays = []; document.getElementById('rows-target').innerHTML = '';
             let nextId = 1; if (db.docs.length > 0) nextId = Math.max(...db.docs.map(d => parseInt(d.id) || 0)) + 1;
             document.getElementById('doc-id').innerText = nextId.toString().padStart(5, '0');
             document.getElementById('doc-date-display').innerText = new Date().toLocaleDateString('en-GB');
-            document.getElementById('c-name').value = ''; document.getElementById('c-phone').innerText = 'PHONE';
+            document.getElementById('c-name').value = ''; document.getElementById('c-phone').innerText = 'PHONE NO.';
             document.getElementById('v-reg').innerText = '---'; document.getElementById('v-model').innerText = '---';
             document.getElementById('v-mile').innerText = '0 km'; document.getElementById('job-notes').innerHTML = '...';
             document.getElementById('fin-disc-amt').innerText = '0.00';
@@ -374,7 +383,6 @@
 
         function saveClientNote() { const n = document.getElementById('client-note-input').value; rdb.ref('autotech_data/clientNotes/' + currentClientViewing).set(n).then(()=>alert("Saved")); }
 
-        /* HELPERS */
         function openPayModal() { document.getElementById('pay-date').value = new Date().toISOString().split('T')[0]; renderPayHistory(); document.getElementById('pay-modal').classList.add('active'); }
         function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; const d = document.getElementById('pay-date').value.split('-').reverse().join('/'); if(v > 0) { activePays.push({ amt: v, date: d, method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); calc(); } }
         function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1"><span>${p.date}</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();calc()">✕</button></div>`).join(''); }
@@ -393,7 +401,31 @@
         function fillFromMemory(id) { const m = db.docs.find(x => x.id === id); document.getElementById('c-name').value = m.client; document.getElementById('c-phone').innerText = m.phone; document.getElementById('v-reg').innerText = m.reg; document.getElementById('v-model').innerText = m.model; document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
-        function downloadPDF() { html2pdf().from(document.getElementById('pdf-area')).save(`Job-${document.getElementById('doc-id').innerText}.pdf`); }
+
+        function downloadPDF() {
+            const element = document.getElementById('pdf-area');
+            const opt = {
+                margin: 0,
+                filename: `Job-${document.getElementById('doc-id').innerText}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2, 
+                    useCORS: true, 
+                    logging: false,
+                    width: 750, 
+                    scrollY: -window.scrollY 
+                },
+                jsPDF: { unit: 'px', hotfixes: ['px_scaling'], format: [750, 1050], orientation: 'portrait' }
+            };
+
+            const originalTransform = element.style.transform;
+            element.style.transform = 'none'; 
+            
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.style.transform = originalTransform; 
+            });
+        }
+        
         document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) calc(); });
     </script>
 </body>

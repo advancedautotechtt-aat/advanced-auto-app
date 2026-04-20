@@ -24,43 +24,27 @@
             .sidebar { display: none; }
             .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: #0f172a; border-top: 1px solid #334155; z-index: 1000; height: 65px; justify-content: space-around; align-items: center; }
             .main-content { padding-bottom: 80px; }
-            .pdf-wrap { display: flex; justify-content: center; overflow-x: hidden; width: 100%; }
-            #pdf-area { transform: scale(0.42); transform-origin: top center; margin-bottom: -650px; flex-shrink: 0; }
+            #view-dash, #view-clients { overflow-y: auto; height: 100%; -webkit-overflow-scrolling: touch; }
+            .pdf-wrap { display: flex; justify-content: center; width: 100%; overflow-x: hidden; padding-top: 10px; }
+            #pdf-area { transform: scale(0.42); transform-origin: top center; margin-bottom: -550px; flex-shrink: 0; }
         }
 
         .nav-btn { padding: 18px 25px; cursor: pointer; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-left: 4px solid transparent; }
         .nav-btn.active { background: #1e293b; color: white; border-left-color: var(--brand-red); }
         .main-content { flex-grow: 1; overflow-y: auto; background: #1e293b; scroll-behavior: smooth; }
 
-        #pdf-area { 
-            width: 750px; 
-            min-height: 1000px; 
-            background: white; 
-            padding: 45px; 
-            color: #1e293b; 
-            display: flex; 
-            flex-direction: column; 
-            position: relative;
-            box-sizing: border-box;
-        }
-        
+        #pdf-area { width: 750px; min-height: 1050px; background: white; padding: 45px; color: #1e293b; display: flex; flex-direction: column; position: relative; box-sizing: border-box; }
         .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
-        .w-desc  { width: 50%; }
-        .w-price { width: 15%; text-align: right; }
-        .w-qty   { width: 10%; text-align: center; }
-        .w-total { width: 20%; text-align: right; }
-        .w-del   { width: 5%; text-align: center; }
-        
         .pdf-table th { background: #0f172a; color: white; font-size: 10px; padding: 12px 8px; text-transform: uppercase; }
-        .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #f1f5f9; font-size: 12px; vertical-align: top; word-wrap: break-word; line-height: 1.4; }
+        .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #cbd5e1; font-size: 12px; vertical-align: top; word-wrap: break-word; line-height: 1.4; color: #000; }
         
-        .suggestion-box { position: absolute; background: white; color: black; border: 1px solid #0f172a; width: 280px; z-index: 5000; max-height: 250px; overflow-y: auto; border-radius: 8px; font-size: 11px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .footer-branding { width: 100%; height: 35px; background: var(--brand-red); color: white; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; margin-top: auto; }
+        .suggestion-box { position: absolute; background: white; color: black; border: 1px solid #cbd5e1; width: 350px; z-index: 9999; max-height: 300px; overflow-y: auto; border-radius: 12px; font-size: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); top: 100%; left: 0; }
+        .footer-branding { width: 100%; height: 35px; background: var(--brand-red); color: white; display: flex !important; align-items: center; justify-content: center; font-weight: 900; font-size: 10px; margin-top: auto; }
+        
         .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal.active { display: flex; }
         .badge-quote { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
         .badge-inv { background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
-        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
@@ -69,8 +53,8 @@
         <div class="p-8"><h1 class="text-xl font-black italic text-white uppercase">Advanced <span class="text-red-600">Auto</span></h1></div>
         <div onclick="showTab('dash')" class="nav-btn active" id="tab-dash">📋 Dashboard</div>
         <div onclick="initNewDoc()" class="nav-btn">➕ New Job</div>
-        <div onclick="showTab('clients')" class="nav-btn" id="tab-clients">👥 Directory</div>
-        <div onclick="showTab('inventory')" class="nav-btn" id="tab-inventory">📦 Database</div>
+        <div onclick="showTab('clients')" class="nav-btn" id="tab-clients">👥 Fleet Directory</div>
+        <div onclick="showTab('inventory')" class="nav-btn" id="tab-inventory">📦 Service DB</div>
         <div onclick="showTab('settings')" class="nav-btn" id="tab-settings">⚙️ Settings</div>
     </div>
 
@@ -82,7 +66,7 @@
     </div>
 
     <div class="main-content">
-        <div id="view-dash" class="p-4 md:p-10 max-w-6xl mx-auto">
+        <div id="view-dash" class="p-4 md:p-10 max-w-6xl mx-auto h-full">
              <div class="grid grid-cols-2 gap-4 mb-8">
                 <div class="bg-slate-900 p-6 rounded-3xl border-l-4 border-emerald-500 shadow-xl">
                     <p class="text-[10px] font-black text-slate-500 uppercase">Revenue</p>
@@ -95,7 +79,7 @@
             </div>
             <div class="bg-slate-900 rounded-3xl overflow-hidden shadow-2xl">
                 <input type="text" id="dash-search" onkeyup="renderDashboard()" placeholder="Search Name, Reg or ID..." class="w-full bg-slate-800 p-5 outline-none text-white text-sm">
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto overflow-y-auto">
                     <table class="w-full text-left text-xs min-w-[500px]">
                         <thead class="bg-slate-800 text-slate-500 font-black uppercase">
                             <tr><th class="p-5">Type</th><th class="p-5">Date</th><th class="p-5">Client / Reg</th><th class="p-5 text-right">Total</th></tr>
@@ -108,15 +92,15 @@
 
         <div id="view-editor" class="hidden">
             <div class="no-print bg-slate-900 p-3 sticky top-0 z-[1000] flex flex-wrap justify-center gap-2 border-b border-slate-700">
-                <select id="doc-toggle" onchange="calc()" class="bg-slate-800 text-[10px] font-bold px-3 py-2 rounded-lg text-white">
+                <select id="doc-toggle" onchange="calc()" class="bg-slate-800 text-[10px] font-bold px-3 py-2 rounded-lg text-white uppercase">
                     <option value="INVOICE">INVOICE</option><option value="QUOTE">QUOTE</option><option value="SERVICE RECORD">SERVICE RECORD</option>
                 </select>
-                <button onclick="addRow()" class="bg-blue-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">+ Manual Line</button>
+                <button onclick="addRow()" class="bg-blue-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">+ Line</button>
                 <button onclick="openPayModal()" class="bg-emerald-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">Payments</button>
                 <button onclick="saveDoc()" class="bg-white text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase">Sync Cloud</button>
                 <button onclick="convertToInvoice()" id="convert-btn" class="bg-amber-500 text-black px-3 py-2 rounded-lg text-[10px] font-black uppercase hidden">Convert to Inv</button>
                 <button onclick="deleteDoc()" id="del-btn" class="bg-red-900 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white hidden">Delete</button>
-                <button onclick="downloadPDF()" class="bg-red-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">Download PDF</button>
+                <button onclick="downloadPDF()" class="bg-red-600 px-3 py-2 rounded-lg text-[10px] font-black uppercase text-white">PDF</button>
             </div>
 
             <div class="pdf-wrap">
@@ -127,66 +111,70 @@
                             <div>
                                 <h1 id="brand-1-display" class="text-[20pt] font-black uppercase tracking-tighter">ADVANCED AUTO</h1>
                                 <p id="brand-slogan-display" class="text-[9pt] font-bold text-red-600 uppercase italic"></p>
-                                <p id="brand-addr-display" class="text-[8pt] text-slate-500"></p>
-                                <p id="brand-contact-display" class="text-[9pt] font-black"></p>
+                                <p id="brand-addr-display" class="text-[8pt] text-slate-800"></p>
+                                <p id="brand-contact-display" class="text-[9pt] font-black text-black"></p>
                             </div>
                         </div>
                         <div class="text-right">
                             <h1 id="doc-type-display" class="text-[28pt] font-black italic text-red-600 leading-none">INVOICE</h1>
-                            <p class="text-[10pt] font-bold mt-2">No: <span contenteditable="true" id="doc-id">---</span></p>
-                            <p class="text-[9pt] text-slate-400 font-bold uppercase">Date: <span contenteditable="true" id="doc-date-display"></span></p>
+                            <p class="text-[10pt] font-bold mt-2 text-black">No: <span contenteditable="true" id="doc-id">---</span></p>
+                            <p class="text-[9pt] text-slate-800 font-bold uppercase">Date: <span contenteditable="true" id="doc-date-display"></span></p>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-10 border-y-2 border-slate-900 py-6 mb-4">
+                    <div class="grid grid-cols-2 gap-10 border-y-2 border-slate-900 py-6 mb-4 text-black">
                         <div class="relative">
-                            <p class="text-[8pt] font-black text-slate-400 uppercase mb-1">Customer Details</p>
-                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="CUSTOMER NAME" class="w-full font-black uppercase text-[13pt] border-none outline-none bg-transparent">
-                            <div id="s-name" class="suggestion-box hidden"></div>
-                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-500 text-[10pt]">PHONE NO.</div>
+                            <p class="text-[8pt] font-black text-slate-500 uppercase mb-1">Customer Details</p>
+                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="START TYPING NAME..." class="w-full font-black uppercase text-[13pt] border-none outline-none bg-transparent">
+                            <div id="s-client" class="suggestion-box hidden"></div>
+                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-800 text-[10pt]">PHONE NO.</div>
                         </div>
                         <div class="text-right relative">
-                            <p class="text-[8pt] font-black text-slate-400 uppercase mb-1">Vehicle Information</p>
-                            <div class="font-bold text-[10pt]">Vehicle Make & Model: <span contenteditable="true" id="v-model" class="font-normal uppercase">---</span></div>
-                            <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-normal text-red-600 uppercase">---</span></div>
-                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" class="font-normal">0 km</span></div>
+                            <p class="text-[8pt] font-black text-slate-500 uppercase mb-1">Vehicle Information</p>
+                            <div class="font-bold text-[10pt]">Vehicle: <span contenteditable="true" id="v-model" oninput="showSuggestions(this, 'model')" class="font-bold uppercase underline">---</span></div>
+                            <div id="s-model" class="suggestion-box hidden text-left right-0"></div>
+                            <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-black text-red-600 uppercase">---</span></div>
                             <div id="s-reg" class="suggestion-box hidden text-left right-0"></div>
+                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" class="font-bold">0 km</span></div>
                         </div>
                     </div>
 
                     <div class="flex-grow">
                         <table class="pdf-table">
-                            <thead>
-                                <tr>
-                                    <th class="w-desc">Description</th>
-                                    <th class="w-price">Price</th>
-                                    <th class="w-qty">Qty</th>
-                                    <th class="w-total">Total</th>
-                                    <th class="w-del no-print"></th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th style="width:50%">Description</th><th style="width:15%;text-align:right">Price</th><th style="width:10%;text-align:center">Qty</th><th style="width:20%;text-align:right">Total</th><th class="no-print" style="width:5%"></th></tr></thead>
                             <tbody id="rows-target"></tbody>
                         </table>
-
                         <div class="grid grid-cols-2 gap-4 mt-6">
-                            <div class="bg-slate-50 p-3 rounded-xl border border-dashed border-slate-300 self-start">
-                                <p class="text-[8pt] font-black uppercase text-slate-400 mb-1">Service/Tech Notes</p>
-                                <div contenteditable="true" id="job-notes" class="text-[9pt] outline-none min-h-[40px]">...</div>
+                            <div class="bg-slate-50 p-3 rounded-xl border border-dashed border-slate-400 self-start">
+                                <p class="text-[8pt] font-black uppercase text-slate-600 mb-1">Service/Tech Notes</p>
+                                <div contenteditable="true" id="job-notes" class="text-[9pt] outline-none min-h-[40px] text-black">...</div>
                             </div>
                             <div class="flex justify-end">
                                 <div class="w-64 space-y-1">
-                                    <div class="flex justify-between text-slate-500 font-bold text-[9pt]"><span>Subtotal</span><span id="fin-sub">$0.00</span></div>
-                                    <div class="flex justify-between text-blue-600 font-bold text-[9pt]"><span>Discount</span><span>-$<span contenteditable="true" id="fin-disc-amt">0.00</span></span></div>
-                                    <div class="flex justify-between text-emerald-600 font-bold text-[9pt]"><span>Paid Amount</span><span id="fin-paid">$0.00</span></div>
+                                    <div class="flex justify-between text-slate-800 font-bold text-[9pt]"><span>Subtotal</span><span id="fin-sub">$0.00</span></div>
+                                    <div class="flex justify-between text-blue-800 font-bold text-[9pt]"><span>Discount</span><span>-$<span contenteditable="true" id="fin-disc-amt">0.00</span></span></div>
+                                    <div class="flex justify-between text-emerald-800 font-bold text-[9pt]"><span>Paid Amount</span><span id="fin-paid">$0.00</span></div>
                                     <div class="flex justify-between text-red-600 text-[18pt] font-black border-t-2 border-slate-900 pt-1"><span>TOTAL DUE</span><span id="fin-due">$0.00</span></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-
                     <div class="footer-branding uppercase tracking-widest italic">Advanced Auto • Reliable Excellence</div>
                 </div>
             </div>
+        </div>
+
+        <div id="view-clients" class="hidden max-w-6xl mx-auto p-4 md:p-10">
+            <div class="flex flex-col md:flex-row gap-4 mb-6">
+                <input type="text" id="dir-search" onkeyup="renderClients()" placeholder="Search Name or Reg..." class="flex-grow bg-slate-900 p-5 rounded-3xl outline-none shadow-xl">
+                <select id="dir-sort" onchange="renderClients()" class="bg-slate-800 text-white px-6 py-4 rounded-3xl outline-none font-bold text-xs uppercase">
+                    <option value="alpha">A-Z Name</option>
+                    <option value="last">Last Visit</option>
+                    <option value="spend">Highest Spend</option>
+                    <option value="visits">Most Visits</option>
+                </select>
+            </div>
+            <div id="client-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
 
         <div id="view-inventory" class="hidden max-w-4xl mx-auto p-4 md:p-10">
@@ -195,13 +183,13 @@
                 <input type="hidden" id="inv-edit-idx" value="-1">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-4">
-                        <input type="text" id="inv-name" placeholder="Item Name" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm font-bold">
-                        <input type="number" id="inv-price" placeholder="Default Price ($)" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm font-bold">
+                        <input type="text" id="inv-name" placeholder="Item Name" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm font-bold text-white">
+                        <input type="number" id="inv-price" placeholder="Default Price ($)" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm font-bold text-white">
                     </div>
-                    <textarea id="inv-desc" placeholder="Details..." class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm min-h-[120px]"></textarea>
+                    <textarea id="inv-desc" placeholder="Details..." class="w-full bg-slate-800 p-4 rounded-xl outline-none text-sm min-h-[120px] text-white"></textarea>
                 </div>
                 <div class="flex gap-2 mt-4">
-                    <button id="inv-save-btn" onclick="saveInventory()" class="flex-grow bg-emerald-600 py-4 rounded-xl font-black uppercase text-xs">Save to Database</button>
+                    <button id="inv-save-btn" onclick="saveInventory()" class="flex-grow bg-emerald-600 py-4 rounded-xl font-black uppercase text-xs">Save Item</button>
                     <button id="inv-cancel-btn" onclick="cancelInvEdit()" class="hidden bg-slate-700 px-6 rounded-xl font-black uppercase text-xs text-white">Cancel</button>
                 </div>
             </div>
@@ -216,36 +204,46 @@
             </div>
         </div>
 
-        <div id="view-clients" class="hidden max-w-6xl mx-auto p-4 md:p-10">
-            <input type="text" id="dir-search" onkeyup="renderClients()" placeholder="Search Directory..." class="w-full bg-slate-900 p-5 rounded-3xl outline-none mb-6 shadow-xl">
-            <div id="client-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-        </div>
-
         <div id="view-settings" class="hidden max-w-2xl mx-auto p-4 md:p-10">
             <div class="bg-slate-900 p-6 rounded-3xl space-y-4 shadow-xl">
                 <h3 class="text-xs font-black uppercase text-red-500">Workshop Setup</h3>
-                <input type="text" id="set-n1" placeholder="Name" class="w-full bg-slate-800 p-4 rounded-xl outline-none">
-                <input type="text" id="set-slogan" placeholder="Slogan" class="w-full bg-slate-800 p-4 rounded-xl outline-none">
-                <input type="text" id="set-addr" placeholder="Address" class="w-full bg-slate-800 p-4 rounded-xl outline-none">
-                <input type="text" id="set-ph" placeholder="Contact" class="w-full bg-slate-800 p-4 rounded-xl outline-none">
-                <div class="p-4 bg-slate-800 rounded-xl">
-                    <p class="text-[10px] text-slate-400 mb-2 uppercase font-black">Workshop Logo</p>
-                    <input type="file" onchange="handleLogoUpload(this)" class="block w-full text-xs text-slate-400">
-                </div>
+                <input type="text" id="set-n1" placeholder="Workshop Name" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-white">
+                <input type="text" id="set-slogan" placeholder="Slogan" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-white">
+                <input type="text" id="set-addr" placeholder="Address" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-white">
+                <input type="text" id="set-ph" placeholder="Contact Details" class="w-full bg-slate-800 p-4 rounded-xl outline-none text-white">
+                <input type="file" onchange="handleLogoUpload(this)" class="block w-full text-xs text-slate-400">
                 <button onclick="saveSettings()" class="w-full bg-red-600 py-4 rounded-xl font-black uppercase">Save Workshop Info</button>
             </div>
         </div>
     </div>
 
+    <div id="client-modal" class="modal">
+        <div class="bg-slate-900 p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-slate-700">
+            <div id="mc-content"></div>
+            <div class="mt-6 border-t border-slate-700 pt-4 text-white">
+                <h4 class="text-xs font-black uppercase text-red-500 mb-2">Customer Profile</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="text-[9px] uppercase font-bold text-slate-500">Update Phone Number</label>
+                        <input type="text" id="client-phone-input" class="w-full bg-slate-800 p-3 rounded-xl text-sm outline-none" placeholder="Phone...">
+                    </div>
+                </div>
+                <label class="text-[9px] uppercase font-bold text-slate-500">Internal Workshop Notes</label>
+                <textarea id="client-note-input" class="w-full bg-slate-800 p-4 rounded-xl text-sm outline-none mb-2" placeholder="Private notes..."></textarea>
+                <button onclick="saveClientProfile()" class="bg-blue-600 px-6 py-2 rounded-lg text-xs font-black uppercase">Update Profile</button>
+            </div>
+            <button onclick="closeModal('client-modal')" class="w-full mt-6 bg-slate-800 py-3 rounded-xl font-black text-white uppercase text-xs">Close</button>
+        </div>
+    </div>
+
     <div id="pay-modal" class="modal"><div class="bg-white text-slate-900 p-6 rounded-3xl w-full max-w-xs"><h3 class="font-black uppercase text-center mb-4 text-slate-400">Post Payment</h3><div id="modal-payment-list" class="mb-4 space-y-2 max-h-32 overflow-y-auto border-b pb-2 text-[10px]"></div><div class="space-y-3"><input type="date" id="pay-date" class="w-full border p-3 rounded-xl font-bold bg-slate-50"><input type="number" id="pay-val" placeholder="Amount" class="w-full border p-3 rounded-xl font-black bg-slate-50"><select id="pay-method" class="w-full border p-3 rounded-xl font-black bg-slate-50"><option value="Cash">CASH</option><option value="Card">CARD</option><option value="Cheque">CHEQUE</option></select><button onclick="addPayment()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase">Add Payment</button><button onclick="closeModal('pay-modal')" class="w-full text-slate-400 text-[10px] font-black uppercase pt-2">Close</button></div></div></div>
-    <div id="client-modal" class="modal"><div class="bg-slate-900 p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"><div id="mc-content"></div><div class="mt-6 border-t border-slate-700 pt-4"><h4 class="text-xs font-black uppercase text-red-500 mb-2">Fleet Reminders</h4><textarea id="client-note-input" class="w-full bg-slate-800 p-4 rounded-xl text-sm outline-none mb-2" placeholder="Private notes..."></textarea><button onclick="saveClientNote()" class="bg-blue-600 px-6 py-2 rounded-lg text-xs font-black uppercase">Save Note</button></div><button onclick="closeModal('client-modal')" class="w-full mt-6 bg-slate-800 py-3 rounded-xl font-black text-white uppercase text-xs">Close</button></div></div>
 
     <script>
         const firebaseConfig = { apiKey: "AIzaSyDmBG5zcJFfZW_oeDaAtnO09amq-BycRCk", authDomain: "autotech-pro.firebaseapp.com", databaseURL: "https://autotech-pro-default-rtdb.firebaseio.com", projectId: "autotech-pro", storageBucket: "autotech-pro.firebasestorage.app", messagingSenderId: "565284746994", appId: "1:565284746994:web:5d62fe269d4d6a038e826b" };
         firebase.initializeApp(firebaseConfig);
         const rdb = firebase.database();
 
-        let db = { docs: [], settings: {}, inventory: [], clientNotes: {} };
+        let db = { docs: [], settings: {}, inventory: [], clientNotes: {}, clientPhones: {} };
         let activePays = [];
         let curLogo = "";
         let currentClientViewing = "";
@@ -256,81 +254,162 @@
             db.settings = val.settings || {};
             db.inventory = val.inventory || [];
             db.clientNotes = val.clientNotes || {};
+            db.clientPhones = val.clientPhones || {};
             applySettings(); renderDashboard(); renderClients(); renderInventoryList();
         });
 
-        function handleLogoUpload(input) {
-            const reader = new FileReader();
-            reader.onload = (e) => { 
-                curLogo = e.target.result;
-                document.getElementById('logo-img-display').src = curLogo;
-                document.getElementById('logo-img-display').classList.remove('hidden');
-            };
-            if(input.files[0]) reader.readAsDataURL(input.files[0]);
+        // SUGGESTIONS & AUTOFILL
+        function showSuggestions(el, type) {
+            const val = el.innerText ? el.innerText.toUpperCase() : el.value.toUpperCase();
+            const box = document.getElementById('s-' + type);
+            if (val.length < 1) { box.classList.add('hidden'); return; }
+
+            const uniqueEntries = new Map();
+            db.docs.forEach(d => {
+                let matchVal = (type === 'client') ? d.client : (type === 'reg' ? d.reg : d.model);
+                if (matchVal && matchVal.toUpperCase().includes(val)) {
+                    const key = type === 'client' ? `${d.client}-${d.reg}` : matchVal;
+                    if (!uniqueEntries.has(key)) uniqueEntries.set(key, d);
+                }
+            });
+
+            if (uniqueEntries.size > 0) {
+                box.innerHTML = Array.from(uniqueEntries.values()).map(m => `
+                    <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}')">
+                        <div class="font-black text-[12px] uppercase">${type === 'client' ? m.client : (type === 'reg' ? m.reg : m.model)}</div>
+                        ${type === 'client' ? `<div class="text-[10px] text-red-600 font-bold">${m.reg} — ${m.model}</div>` : ''}
+                    </div>`).join('');
+                box.classList.remove('hidden');
+            } else box.classList.add('hidden');
         }
 
-        function saveInventory() {
-            const idx = parseInt(document.getElementById('inv-edit-idx').value);
-            const name = document.getElementById('inv-name').value.trim();
-            const item = { name, desc: document.getElementById('inv-desc').value.replace(/\n/g, '<br>'), price: parseFloat(document.getElementById('inv-price').value) || 0 };
-            if(!item.name) return;
-            let updated = [...db.inventory];
-            const duplicateIdx = updated.findIndex(i => i.name.toLowerCase() === item.name.toLowerCase());
-            if(idx === -1 && duplicateIdx > -1) { if(confirm(`${item.name} already exists. Edit?`)) editInv(duplicateIdx); return; }
-            if(idx > -1) updated[idx] = item; else updated.push(item);
-            rdb.ref('autotech_data/inventory').set(updated).then(() => cancelInvEdit());
+        function applyAutofill(id, type) {
+            const m = db.docs.find(x => x.id === id);
+            if(type === 'client') {
+                document.getElementById('c-name').value = m.client;
+                document.getElementById('c-phone').innerText = m.phone;
+                document.getElementById('v-reg').innerText = m.reg;
+                document.getElementById('v-model').innerText = m.model;
+            } else if(type === 'reg') {
+                document.getElementById('v-reg').innerText = m.reg;
+                document.getElementById('v-model').innerText = m.model;
+            } else if(type === 'model') {
+                document.getElementById('v-model').innerText = m.model;
+            }
+            document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
         }
 
-        function renderInventoryList() {
-            const q = document.getElementById('inv-search').value.toLowerCase();
-            let list = db.inventory.map((item, originalIdx) => ({...item, originalIdx})).sort((a,b) => a.name.localeCompare(b.name));
-            if(q) list = list.filter(i => i.name.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
-            document.getElementById('inventory-list').innerHTML = list.map(item => `
-                <tr class="hover:bg-slate-800 text-white">
-                    <td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td>
-                    <td class="p-4 font-black">${fmt(item.price)}</td>
-                    <td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td>
-                </tr>`).join('');
+        // FLEET DIRECTORY CORE
+        function renderClients() {
+            const q = (document.getElementById('dir-search').value || "").toLowerCase();
+            const sortBy = document.getElementById('dir-sort').value;
+            const clients = {}; 
+
+            db.docs.forEach(d => { 
+                const n = (d.client || 'UNKNOWN').toUpperCase(); 
+                if(!clients[n]) clients[n] = { name: n, spend: 0, visits: 0, vehicles: new Set(), last: d.date, phone: db.clientPhones[n] || d.phone || 'NO PHONE' };
+                
+                const amt = parseFloat(d.total.replace(/[^0-9.-]+/g,"")) || 0;
+                if(d.type === 'INVOICE') clients[n].spend += amt;
+                if(d.reg) clients[n].vehicles.add(`${d.reg} (${d.model})`);
+                clients[n].visits++;
+
+                if(parseDate(d.date) > parseDate(clients[n].last)) clients[n].last = d.date;
+            });
+
+            let list = Object.values(clients);
+            if(q) list = list.filter(c => c.name.toLowerCase().includes(q) || Array.from(c.vehicles).some(v => v.toLowerCase().includes(q)));
+            
+            if(sortBy === 'alpha') list.sort((a,b) => a.name.localeCompare(b.name));
+            else if(sortBy === 'spend') list.sort((a,b) => b.spend - a.spend);
+            else if(sortBy === 'visits') list.sort((a,b) => b.visits - a.visits);
+            else if(sortBy === 'last') list.sort((a,b) => parseDate(b.last) - parseDate(a.last));
+
+            document.getElementById('client-grid').innerHTML = list.map(c => `
+                <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer hover:border-red-600 transition-all" onclick="viewFleetHistory('${c.name.replace(/'/g, "\\'")}')">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-black text-white uppercase text-lg leading-tight">${c.name}</h4>
+                        <span class="text-[9px] bg-slate-800 px-3 py-1 rounded-full text-red-500 font-black">${c.visits} VISITS</span>
+                    </div>
+                    <p class="text-[10px] text-red-500 font-bold mb-4">${c.phone}</p>
+                    <div class="flex justify-between items-end border-t border-slate-800 pt-4">
+                        <div>
+                            <p class="text-[9px] text-slate-500 uppercase font-black">Lifetime Spend</p>
+                            <p class="text-emerald-500 font-black text-xl">${fmt(c.spend)}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] text-slate-500 font-black uppercase">Last Visit</p>
+                            <p class="text-white font-bold text-xs">${c.last}</p>
+                        </div>
+                    </div>
+                </div>`).join('');
         }
 
-        function editInv(idx) {
-            const i = db.inventory[idx]; document.getElementById('inv-edit-idx').value = idx; document.getElementById('inv-name').value = i.name;
-            document.getElementById('inv-desc').value = i.desc.replace(/<br>/g, '\n'); document.getElementById('inv-price').value = i.price;
-            document.getElementById('inv-form-title').innerText = "Edit Database Item"; document.getElementById('inv-save-btn').innerText = "Update"; document.getElementById('inv-cancel-btn').classList.remove('hidden');
+        function viewFleetHistory(name) {
+            currentClientViewing = name;
+            const jobs = db.docs.filter(d => d.client.toUpperCase() === name.toUpperCase());
+            const vehicles = {}; 
+            jobs.forEach(j => { 
+                const r = (j.reg || 'NO-REG').toUpperCase(); 
+                if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; 
+                vehicles[r].history.push(j); 
+            });
+
+            document.getElementById('client-note-input').value = db.clientNotes[name] || "";
+            document.getElementById('client-phone-input').value = db.clientPhones[name] || (jobs[0] ? jobs[0].phone : "");
+
+            document.getElementById('mc-content').innerHTML = `
+                <h2 class="text-3xl font-black text-white uppercase mb-1">${name}</h2>
+                <p class="text-red-500 font-black text-xs uppercase mb-6 tracking-widest">Master Fleet Record</p>
+                <div class="space-y-6">${Object.entries(vehicles).map(([reg, v]) => `
+                    <div class="bg-slate-800 rounded-3xl p-5 border border-slate-700 shadow-xl">
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
+                            <span class="text-xl font-black text-white uppercase">${reg}</span>
+                            <span class="text-xs font-bold text-slate-400 uppercase italic">${v.model}</span>
+                        </div>
+                        <div class="space-y-2">${v.history.sort((a,b)=>parseDate(b.date)-parseDate(a.date)).map(j => `
+                            <div class="flex justify-between items-center text-[11px] p-3 bg-slate-900 rounded-xl cursor-pointer hover:bg-slate-700 transition-colors" onclick="closeModal('client-modal');loadDoc('${j.id}')">
+                                <div class="flex gap-3 items-center">
+                                    <span class="${j.type==='QUOTE'?'badge-quote':'badge-inv'}">${j.type}</span>
+                                    <span class="text-slate-400 font-bold">${j.date}</span>
+                                </div>
+                                <b class="text-white font-black">${j.total}</b>
+                            </div>`).join('')}</div>
+                    </div>`).join('')}</div>`;
+            document.getElementById('client-modal').classList.add('active');
         }
 
-        function cancelInvEdit() {
-            document.getElementById('inv-edit-idx').value = "-1"; document.getElementById('inv-name').value = ''; document.getElementById('inv-desc').value = ''; document.getElementById('inv-price').value = '';
-            document.getElementById('inv-form-title').innerText = "Service Database Manager"; document.getElementById('inv-save-btn').innerText = "Save to Database"; document.getElementById('inv-cancel-btn').classList.add('hidden');
+        function saveClientProfile() { 
+            const updates = {};
+            updates['clientNotes/' + currentClientViewing] = document.getElementById('client-note-input').value;
+            updates['clientPhones/' + currentClientViewing] = document.getElementById('client-phone-input').value;
+            rdb.ref('autotech_data').update(updates).then(() => { alert("Profile Updated"); renderClients(); });
         }
 
-        function deleteInv(idx) { if(confirm("Delete?")) { const updated = db.inventory.filter((_, i) => i !== idx); rdb.ref('autotech_data/inventory').set(updated); } }
-
-        function initNewDoc() {
-            activePays = []; document.getElementById('rows-target').innerHTML = '';
-            let nextId = 1; if (db.docs.length > 0) nextId = Math.max(...db.docs.map(d => parseInt(d.id) || 0)) + 1;
-            document.getElementById('doc-id').innerText = nextId.toString().padStart(5, '0');
-            document.getElementById('doc-date-display').innerText = new Date().toLocaleDateString('en-GB');
-            document.getElementById('c-name').value = ''; document.getElementById('c-phone').innerText = 'PHONE NO.';
-            document.getElementById('v-reg').innerText = '---'; document.getElementById('v-model').innerText = '---';
-            document.getElementById('v-mile').innerText = '0 km'; document.getElementById('job-notes').innerHTML = '...';
-            document.getElementById('fin-disc-amt').innerText = '0.00';
-            document.getElementById('del-btn').classList.add('hidden'); document.getElementById('convert-btn').classList.add('hidden');
-            addRow(); showTab('editor'); calc();
-        }
-
-        function addRow(data = null) {
+        // EDITOR & CALCULATIONS
+        function addRow() {
             const tr = document.createElement('tr'); tr.className = "row-obj";
-            const name = data ? data.name : "Service/Part"; const desc = data ? data.desc : "Details..."; const price = data ? data.price : 0;
-            tr.innerHTML = `<td class="w-desc relative"><div contenteditable="true" class="font-black uppercase d-name-input" onkeyup="handleRowSearch(this)">${name}</div><div contenteditable="true" class="text-[7pt] text-slate-400 italic d-desc-input">${desc}</div><div class="row-suggest suggestion-box hidden"></div></td><td class="w-price"><span>$</span><span contenteditable="true" class="p-in">${price}</span></td><td class="w-qty" contenteditable="true"><span class="q-in">1</span></td><td class="w-total font-black l-in">$0.00</td><td class="w-del no-print"><button onclick="this.closest('tr').remove();calc()" class="text-red-500 font-bold">✕</button></td>`;
+            tr.innerHTML = `
+                <td class="w-desc relative">
+                    <div contenteditable="true" class="font-black uppercase d-name-input text-black" onkeyup="handleRowSearch(this)">Service/Part</div>
+                    <div contenteditable="true" class="text-[7pt] d-desc-input italic">Details...</div>
+                    <div class="row-suggest suggestion-box hidden"></div>
+                </td>
+                <td class="w-price text-black" style="text-align:right"><span>$</span><span contenteditable="true" class="p-in">0.00</span></td>
+                <td class="w-qty text-black" contenteditable="true" style="text-align:center"><span class="q-in">1</span></td>
+                <td class="w-total font-black l-in text-black" style="text-align:right">$0.00</td>
+                <td class="w-del no-print" style="text-align:center"><button onclick="this.closest('tr').remove();calc()" class="text-red-500 font-bold">✕</button></td>`;
             document.getElementById('rows-target').appendChild(tr); calc();
         }
 
         function handleRowSearch(el) {
             const val = el.innerText.toLowerCase().trim(); const box = el.parentElement.querySelector('.row-suggest');
             if(val.length < 2) { box.classList.add('hidden'); return; }
-            const matches = db.inventory.filter(i => i.name.toLowerCase().includes(val)).sort((a,b)=>a.name.localeCompare(b.name));
-            if(matches.length > 0) { box.innerHTML = matches.map(m => `<div class="p-3 border-b cursor-pointer hover:bg-slate-100 flex justify-between" onclick="selectRowItem(this, '${m.name.replace(/'/g, "\\'")}', '${m.desc.replace(/'/g, "\\'")}', ${m.price})"><span><b>${m.name}</b></span><span>$${m.price}</span></div>`).join(''); box.classList.remove('hidden'); } else box.classList.add('hidden');
+            const matches = db.inventory.filter(i => i.name.toLowerCase().includes(val));
+            if(matches.length > 0) { 
+                box.innerHTML = matches.map(m => `<div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100 flex justify-between" onclick="selectRowItem(this, '${m.name.replace(/'/g, "\\'")}', '${m.desc.replace(/'/g, "\\'")}', ${m.price})"><span><b>${m.name}</b></span><span>$${m.price}</span></div>`).join(''); 
+                box.classList.remove('hidden'); 
+            } else box.classList.add('hidden');
         }
 
         function selectRowItem(el, name, desc, price) {
@@ -339,8 +418,13 @@
         }
 
         function calc() {
-            let sub = 0; document.querySelectorAll('.row-obj').forEach(r => { const p = parseFloat(r.querySelector('.p-in').innerText.replace(/[^0-9.-]+/g,"")) || 0; const q = parseFloat(r.querySelector('.q-in').innerText) || 1; const t = p * q; sub += t; r.querySelector('.l-in').innerText = fmt(t); });
-            const disc = parseFloat(document.getElementById('fin-disc-amt').innerText) || 0; const paid = activePays.reduce((a, b) => a + b.amt, 0);
+            let sub = 0; document.querySelectorAll('.row-obj').forEach(r => { 
+                const p = parseFloat(r.querySelector('.p-in').innerText.replace(/[^0-9.-]+/g,"")) || 0; 
+                const q = parseFloat(r.querySelector('.q-in').innerText) || 1; 
+                sub += (p * q); r.querySelector('.l-in').innerText = fmt(p * q); 
+            });
+            const disc = parseFloat(document.getElementById('fin-disc-amt').innerText) || 0; 
+            const paid = activePays.reduce((a, b) => a + b.amt, 0);
             document.getElementById('fin-sub').innerText = fmt(sub); document.getElementById('fin-paid').innerText = fmt(paid); document.getElementById('fin-due').innerText = fmt(sub - disc - paid);
             document.getElementById('doc-type-display').innerText = document.getElementById('doc-toggle').value;
         }
@@ -348,7 +432,7 @@
         function saveDoc() {
             const id = document.getElementById('doc-id').innerText;
             const doc = { id, type: document.getElementById('doc-toggle').value, date: document.getElementById('doc-date-display').innerText, client: document.getElementById('c-name').value.toUpperCase(), phone: document.getElementById('c-phone').innerText, reg: document.getElementById('v-reg').innerText.toUpperCase(), model: document.getElementById('v-model').innerText.toUpperCase(), mileage: document.getElementById('v-mile').innerText, notes: document.getElementById('job-notes').innerHTML, rows: document.getElementById('rows-target').innerHTML, total: document.getElementById('fin-sub').innerText, discount: document.getElementById('fin-disc-amt').innerText, payments: activePays };
-            if(!doc.client || doc.client === "NAME") return;
+            if(!doc.client) return alert("Customer Name Required");
             let docs = [...db.docs]; const idx = docs.findIndex(x => x.id === id); if(idx > -1) docs[idx] = doc; else docs.push(doc);
             rdb.ref('autotech_data/docs').set(docs).then(() => showTab('dash'));
         }
@@ -359,6 +443,18 @@
             document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); document.getElementById('del-btn').classList.remove('hidden'); showTab('editor'); calc();
         }
 
+        function initNewDoc() {
+            activePays = []; document.getElementById('rows-target').innerHTML = '';
+            let nextId = 1; if (db.docs.length > 0) nextId = Math.max(...db.docs.map(d => parseInt(d.id) || 0)) + 1;
+            document.getElementById('doc-id').innerText = nextId.toString().padStart(5, '0');
+            document.getElementById('doc-date-display').innerText = new Date().toLocaleDateString('en-GB');
+            document.getElementById('c-name').value = ''; document.getElementById('c-phone').innerText = 'PHONE NO.';
+            document.getElementById('v-reg').innerText = '---'; document.getElementById('v-model').innerText = '---';
+            document.getElementById('v-mile').innerText = '0 km'; document.getElementById('job-notes').innerHTML = '...';
+            document.getElementById('fin-disc-amt').innerText = '0.00';
+            document.getElementById('del-btn').classList.add('hidden'); addRow(); showTab('editor'); calc();
+        }
+
         function renderDashboard() {
             const q = (document.getElementById('dash-search').value || "").toLowerCase();
             let rev = 0, qTot = 0; db.docs.forEach(i => { const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0; if(i.type === 'INVOICE') rev += t; else if(i.type === 'QUOTE') qTot += t; });
@@ -367,66 +463,76 @@
             document.getElementById('dash-list').innerHTML = filtered.map(i => `<tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.id}')"><td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td><td class="p-5 text-slate-400 text-[10px]">${i.date}</td><td class="p-5 font-bold uppercase">${i.client}<br><span class="text-red-500 text-[9px] font-black">${i.reg}</span></td><td class="p-5 text-right font-black">${i.total}</td></tr>`).join('');
         }
 
-        function renderClients() {
-            const q = (document.getElementById('dir-search').value || "").toLowerCase();
-            const clients = {}; db.docs.forEach(d => { const n = (d.client || 'UNKNOWN').toUpperCase(); if(n.toLowerCase().includes(q) || (d.reg && d.reg.toLowerCase().includes(q))) { if(!clients[n]) clients[n] = { spend: 0, count: 0, v: new Set() }; if(d.type === 'INVOICE') clients[n].spend += (parseFloat(d.total.replace(/[^0-9.-]+/g,"")) || 0); if(d.reg) clients[n].v.add(d.reg); clients[n].count++; } });
-            document.getElementById('client-grid').innerHTML = Object.entries(clients).map(([name, data]) => `<div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 cursor-pointer hover:border-red-600" onclick="viewClient('${name.replace(/'/g, "\\'")}')"><h4 class="font-black text-white uppercase text-sm">${name}</h4><div class="flex justify-between mt-1"><p class="text-[9px] text-slate-500 font-bold uppercase">${data.v.size} Vehicles</p><p class="text-[9px] text-red-500 font-black uppercase">${data.count} Visits</p></div><div class="mt-4 text-emerald-500 font-black text-lg">${fmt(data.spend)}</div></div>`).join('');
+        function downloadPDF() {
+            const opt = { margin: 0, filename: `AdvancedAuto-${document.getElementById('doc-id').innerText}.pdf`, image: { type: 'jpeg', quality: 1.0 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'px', format: [750, 1050] } };
+            html2pdf().set(opt).from(document.getElementById('pdf-area')).save();
         }
 
-        function viewClient(name) {
-            currentClientViewing = name; const jobs = db.docs.filter(d => d.client.toUpperCase() === name);
-            const vehicles = {}; jobs.forEach(j => { const r = (j.reg || 'NO-REG').toUpperCase(); if(!vehicles[r]) vehicles[r] = { model: j.model, jobs: [] }; vehicles[r].jobs.push(j); });
-            document.getElementById('client-note-input').value = db.clientNotes[name] || "";
-            document.getElementById('mc-content').innerHTML = `<h2 class="text-2xl font-black text-white uppercase mb-4">${name}</h2><div class="space-y-4">${Object.entries(vehicles).map(([reg, v]) => `<div class="bg-slate-800 rounded-2xl p-4 border border-slate-700"><div class="flex justify-between font-black uppercase mb-2"><span>${reg}</span><span class="text-red-500">${v.model}</span></div><div class="space-y-1">${v.jobs.sort((a,b)=>b.id-a.id).map(j => `<div class="flex justify-between text-[10px] p-2 bg-slate-900 rounded cursor-pointer hover:bg-slate-700" onclick="closeModal('client-modal');loadDoc('${j.id}')"><span>${j.date} - ${j.type}</span><b>${j.total}</b></div>`).join('')}</div></div>`).join('')}</div>`;
-            document.getElementById('client-modal').classList.add('active');
+        // UTILITIES
+        function parseDate(s) { if(!s) return new Date(0); const p = s.split('/'); return new Date(p[2], p[1]-1, p[0]); }
+        function showTab(id) { document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden')); document.getElementById('view-' + id).classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); if(document.getElementById('tab-'+id)) document.getElementById('tab-'+id).classList.add('active'); }
+        function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; calc(); }
+        function deleteDoc() { if(confirm("Delete?")) { const updated = db.docs.filter(d => d.id !== document.getElementById('doc-id').innerText); rdb.ref('autotech_data/docs').set(updated).then(() => showTab('dash')); } }
+        
+        // INVENTORY
+        function saveInventory() {
+            const idx = parseInt(document.getElementById('inv-edit-idx').value);
+            const name = document.getElementById('inv-name').value.trim();
+            const item = { name, desc: document.getElementById('inv-desc').value.replace(/\n/g, '<br>'), price: parseFloat(document.getElementById('inv-price').value) || 0 };
+            
+            if(!item.name) return;
+
+            // DUPLICATE CHECK logic
+            const isDuplicate = db.inventory.some((existing, i) => {
+                return i !== idx && existing.name.toLowerCase() === item.name.toLowerCase();
+            });
+
+            if(isDuplicate) {
+                alert(`STOP: "${item.name}" already exists in your database. Please edit the existing item or use a different name.`);
+                return;
+            }
+
+            let updated = [...db.inventory]; if(idx > -1) updated[idx] = item; else updated.push(item);
+            rdb.ref('autotech_data/inventory').set(updated).then(() => cancelInvEdit());
         }
 
-        function saveClientNote() { const n = document.getElementById('client-note-input').value; rdb.ref('autotech_data/clientNotes/' + currentClientViewing).set(n).then(()=>alert("Saved")); }
+        function renderInventoryList() {
+            const q = (document.getElementById('inv-search').value || "").toLowerCase();
+            let list = db.inventory.map((item, originalIdx) => ({...item, originalIdx})).sort((a,b) => a.name.localeCompare(b.name));
+            if(q) list = list.filter(i => i.name.toLowerCase().includes(q));
+            document.getElementById('inventory-list').innerHTML = list.map(item => `
+                <tr class="hover:bg-slate-800 text-white">
+                    <td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td>
+                    <td class="p-4 font-black">${fmt(item.price)}</td>
+                    <td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td>
+                </tr>`).join('');
+        }
+        function editInv(idx) { const i = db.inventory[idx]; document.getElementById('inv-edit-idx').value = idx; document.getElementById('inv-name').value = i.name; document.getElementById('inv-desc').value = i.desc.replace(/<br>/g, '\n'); document.getElementById('inv-price').value = i.price; document.getElementById('inv-form-title').innerText = "Edit Database Item"; document.getElementById('inv-save-btn').innerText = "Update"; document.getElementById('inv-cancel-btn').classList.remove('hidden'); }
+        function cancelInvEdit() { document.getElementById('inv-edit-idx').value = "-1"; document.getElementById('inv-name').value = ''; document.getElementById('inv-desc').value = ''; document.getElementById('inv-price').value = ''; document.getElementById('inv-form-title').innerText = "Service Database Manager"; document.getElementById('inv-save-btn').innerText = "Save Item"; document.getElementById('inv-cancel-btn').classList.add('hidden'); }
+        function deleteInv(idx) { if(confirm("Delete?")) { const updated = db.inventory.filter((_, i) => i !== idx); rdb.ref('autotech_data/inventory').set(updated); } }
 
-        function openPayModal() { document.getElementById('pay-date').value = new Date().toISOString().split('T')[0]; renderPayHistory(); document.getElementById('pay-modal').classList.add('active'); }
-        function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; const d = document.getElementById('pay-date').value.split('-').reverse().join('/'); if(v > 0) { activePays.push({ amt: v, date: d, method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); calc(); } }
-        function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1"><span>${p.date}</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();calc()">✕</button></div>`).join(''); }
+        // SETTINGS & LOGO
         function saveSettings() { const s = { n1: document.getElementById('set-n1').value, slogan: document.getElementById('set-slogan').value, addr: document.getElementById('set-addr').value, ph: document.getElementById('set-ph').value, logo: curLogo }; rdb.ref('autotech_data/settings').set(s).then(() => alert("Saved")); }
         function applySettings() {
-            const s = db.settings || {}; document.getElementById('brand-1-display').innerText = s.n1 || 'ADVANCED AUTO';
-            document.getElementById('brand-slogan-display').innerText = s.slogan || ''; document.getElementById('brand-addr-display').innerText = s.addr || '';
+            const s = db.settings || {}; 
+            document.getElementById('brand-1-display').innerText = s.n1 || 'ADVANCED AUTO';
+            document.getElementById('brand-slogan-display').innerText = s.slogan || ''; 
+            document.getElementById('brand-addr-display').innerText = s.addr || '';
             document.getElementById('brand-contact-display').innerText = s.ph || '';
             if(s.logo) { document.getElementById('logo-img-display').src = s.logo; document.getElementById('logo-img-display').classList.remove('hidden'); curLogo = s.logo; }
             document.getElementById('set-n1').value = s.n1 || ''; document.getElementById('set-slogan').value = s.slogan || ''; document.getElementById('set-addr').value = s.addr || ''; document.getElementById('set-ph').value = s.ph || '';
         }
-        function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; calc(); }
-        function deleteDoc() { if(confirm("Delete?")) rdb.ref('autotech_data/docs').set(db.docs.filter(d => d.id !== document.getElementById('doc-id').innerText)).then(() => showTab('dash')); }
-        function showTab(id) { document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden')); document.getElementById('view-' + id).classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); if(document.getElementById('tab-'+id)) document.getElementById('tab-'+id).classList.add('active'); }
-        function showSuggestions(el, type) { const val = el.value.toUpperCase(); const box = document.getElementById(type === 'client' ? 's-name' : 's-reg'); if (val.length < 2) { box.classList.add('hidden'); return; } const matches = db.docs.filter(d => (type === 'client' ? d.client : d.reg).toUpperCase().includes(val)).reduce((acc, curr) => { const key = `${curr.client}-${curr.reg}`; if(!acc.find(x => `${x.client}-${x.reg}` === key)) acc.push(curr); return acc; }, []); if (matches.length > 0) { box.innerHTML = matches.map(m => `<div class="p-3 border-b cursor-pointer text-slate-900" onclick="fillFromMemory('${m.id}')"><b>${m.client}</b> (${m.reg})</div>`).join(''); box.classList.remove('hidden'); } else box.classList.add('hidden'); }
-        function fillFromMemory(id) { const m = db.docs.find(x => x.id === id); document.getElementById('c-name').value = m.client; document.getElementById('c-phone').innerText = m.phone; document.getElementById('v-reg').innerText = m.reg; document.getElementById('v-model').innerText = m.model; document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
-        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
+        function handleLogoUpload(input) { const reader = new FileReader(); reader.onload = (e) => { curLogo = e.target.result; applySettings(); }; if(input.files[0]) reader.readAsDataURL(input.files[0]); }
 
-        function downloadPDF() {
-            const element = document.getElementById('pdf-area');
-            const opt = {
-                margin: 0,
-                filename: `Job-${document.getElementById('doc-id').innerText}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    logging: false,
-                    width: 750, 
-                    scrollY: -window.scrollY 
-                },
-                jsPDF: { unit: 'px', hotfixes: ['px_scaling'], format: [750, 1050], orientation: 'portrait' }
-            };
+        // PAYMENTS
+        function openPayModal() { document.getElementById('pay-date').value = new Date().toISOString().split('T')[0]; renderPayHistory(); document.getElementById('pay-modal').classList.add('active'); }
+        function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; if(v > 0) { activePays.push({ amt: v, date: document.getElementById('pay-date').value.split('-').reverse().join('/'), method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); calc(); } }
+        function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1 text-slate-900"><span>${p.date} (${p.method})</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();calc()">✕</button></div>`).join(''); }
 
-            const originalTransform = element.style.transform;
-            element.style.transform = 'none'; 
-            
-            html2pdf().set(opt).from(element).save().then(() => {
-                element.style.transform = originalTransform; 
-            });
-        }
-        
         document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) calc(); });
+        window.onclick = (e) => { if(!e.target.closest('.relative')) document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
     </script>
 </body>
 </html>

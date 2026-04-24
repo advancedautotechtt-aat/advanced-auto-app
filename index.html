@@ -125,17 +125,17 @@
                     <div class="grid grid-cols-2 gap-10 border-y-2 border-slate-900 py-6 mb-4 text-black">
                         <div class="relative">
                             <p class="text-[8pt] font-black text-slate-500 uppercase mb-1">Customer Details</p>
-                            <input type="text" id="c-name" oninput="showSuggestions(this, 'client')" placeholder="START TYPING NAME..." class="w-full font-black uppercase text-[13pt] border-none outline-none bg-transparent">
+                            <input type="text" id="c-name" onfocus="if(this.value.includes('START TYPING')) this.value=''" oninput="showSuggestions(this, 'client')" placeholder="START TYPING NAME..." class="w-full font-black uppercase text-[13pt] border-none outline-none bg-transparent">
                             <div id="s-client" class="suggestion-box hidden"></div>
-                            <div contenteditable="true" id="c-phone" class="font-bold text-slate-800 text-[10pt]">PHONE NO.</div>
+                            <div contenteditable="true" id="c-phone" onfocus="if(this.innerText.includes('PHONE NO')) this.innerText=''" class="font-bold text-slate-800 text-[10pt]">PHONE NO.</div>
                         </div>
                         <div class="text-right relative">
                             <p class="text-[8pt] font-black text-slate-500 uppercase mb-1">Vehicle Information</p>
-                            <div class="font-bold text-[10pt]">Vehicle: <span contenteditable="true" id="v-model" oninput="showSuggestions(this, 'model')" class="font-bold uppercase underline">---</span></div>
+                            <div class="font-bold text-[10pt]">Vehicle: <span contenteditable="true" id="v-model" onfocus="if(this.innerText.includes('---')) this.innerText=''" oninput="showSuggestions(this, 'model')" class="font-bold uppercase underline">---</span></div>
                             <div id="s-model" class="suggestion-box hidden text-left right-0"></div>
-                            <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" oninput="showSuggestions(this, 'reg')" class="font-black text-red-600 uppercase">---</span></div>
+                            <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" onfocus="if(this.innerText.includes('---')) this.innerText=''" oninput="showSuggestions(this, 'reg')" class="font-black text-red-600 uppercase">---</span></div>
                             <div id="s-reg" class="suggestion-box hidden text-left right-0"></div>
-                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" class="font-bold">0 km</span></div>
+                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" onfocus="if(this.innerText.includes('0 km')) this.innerText=''" class="font-bold">0 km</span></div>
                         </div>
                     </div>
 
@@ -147,7 +147,7 @@
                         <div class="grid grid-cols-2 gap-4 mt-6">
                             <div class="bg-slate-50 p-3 rounded-xl border border-dashed border-slate-400 self-start">
                                 <p class="text-[8pt] font-black uppercase text-slate-600 mb-1">Service/Tech Notes</p>
-                                <div contenteditable="true" id="job-notes" class="text-[9pt] outline-none min-h-[40px] text-black">...</div>
+                                <div contenteditable="true" id="job-notes" onfocus="if(this.innerText.includes('...')) this.innerText=''" class="text-[9pt] outline-none min-h-[40px] text-black">...</div>
                             </div>
                             <div class="flex justify-end">
                                 <div class="w-64 space-y-1">
@@ -247,6 +247,7 @@
         let activePays = [];
         let curLogo = "";
         let currentClientViewing = "";
+        let calcTimeout = null;
 
         rdb.ref('autotech_data').on('value', (snap) => {
             const val = snap.val() || {};
@@ -257,6 +258,21 @@
             db.clientPhones = val.clientPhones || {};
             applySettings(); renderDashboard(); renderClients(); renderInventoryList();
         });
+
+        // DEBOUNCED CALCULATION (Prevents laptop unresponsiveness)
+        function debouncedCalc() {
+            clearTimeout(calcTimeout);
+            calcTimeout = setTimeout(() => { calc(); }, 100);
+        }
+
+        // OPTIMIZED MUTATION WATCHDOG
+        const observer = new MutationObserver((mutations) => {
+            // Only trigger if a change isn't purely from our own innerText updates
+            let shouldTrigger = false;
+            mutations.forEach(m => { if(m.type === 'characterData' || m.type === 'childList') shouldTrigger = true; });
+            if(shouldTrigger) debouncedCalc();
+        });
+        observer.observe(document.getElementById('rows-target'), { childList: true, subtree: true, characterData: true });
 
         // SUGGESTIONS & AUTOFILL
         function showSuggestions(el, type) {
@@ -297,34 +313,29 @@
                 document.getElementById('v-model').innerText = m.model;
             }
             document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
+            debouncedCalc();
         }
 
-        // FLEET DIRECTORY CORE
+        // FLEET DIRECTORY
         function renderClients() {
             const q = (document.getElementById('dir-search').value || "").toLowerCase();
             const sortBy = document.getElementById('dir-sort').value;
             const clients = {}; 
-
             db.docs.forEach(d => { 
                 const n = (d.client || 'UNKNOWN').toUpperCase(); 
                 if(!clients[n]) clients[n] = { name: n, spend: 0, visits: 0, vehicles: new Set(), last: d.date, phone: db.clientPhones[n] || d.phone || 'NO PHONE' };
-                
                 const amt = parseFloat(d.total.replace(/[^0-9.-]+/g,"")) || 0;
                 if(d.type === 'INVOICE') clients[n].spend += amt;
                 if(d.reg) clients[n].vehicles.add(`${d.reg} (${d.model})`);
                 clients[n].visits++;
-
                 if(parseDate(d.date) > parseDate(clients[n].last)) clients[n].last = d.date;
             });
-
             let list = Object.values(clients);
             if(q) list = list.filter(c => c.name.toLowerCase().includes(q) || Array.from(c.vehicles).some(v => v.toLowerCase().includes(q)));
-            
             if(sortBy === 'alpha') list.sort((a,b) => a.name.localeCompare(b.name));
             else if(sortBy === 'spend') list.sort((a,b) => b.spend - a.spend);
             else if(sortBy === 'visits') list.sort((a,b) => b.visits - a.visits);
             else if(sortBy === 'last') list.sort((a,b) => parseDate(b.last) - parseDate(a.last));
-
             document.getElementById('client-grid').innerHTML = list.map(c => `
                 <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 cursor-pointer hover:border-red-600 transition-all" onclick="viewFleetHistory('${c.name.replace(/'/g, "\\'")}')">
                     <div class="flex justify-between items-start mb-2">
@@ -333,14 +344,8 @@
                     </div>
                     <p class="text-[10px] text-red-500 font-bold mb-4">${c.phone}</p>
                     <div class="flex justify-between items-end border-t border-slate-800 pt-4">
-                        <div>
-                            <p class="text-[9px] text-slate-500 uppercase font-black">Lifetime Spend</p>
-                            <p class="text-emerald-500 font-black text-xl">${fmt(c.spend)}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[9px] text-slate-500 font-black uppercase">Last Visit</p>
-                            <p class="text-white font-bold text-xs">${c.last}</p>
-                        </div>
+                        <div><p class="text-[9px] text-slate-500 uppercase font-black">Lifetime Spend</p><p class="text-emerald-500 font-black text-xl">${fmt(c.spend)}</p></div>
+                        <div class="text-right"><p class="text-[9px] text-slate-500 font-black uppercase">Last Visit</p><p class="text-white font-bold text-xs">${c.last}</p></div>
                     </div>
                 </div>`).join('');
         }
@@ -349,33 +354,16 @@
             currentClientViewing = name;
             const jobs = db.docs.filter(d => d.client.toUpperCase() === name.toUpperCase());
             const vehicles = {}; 
-            jobs.forEach(j => { 
-                const r = (j.reg || 'NO-REG').toUpperCase(); 
-                if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; 
-                vehicles[r].history.push(j); 
-            });
-
+            jobs.forEach(j => { const r = (j.reg || 'NO-REG').toUpperCase(); if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; vehicles[r].history.push(j); });
             document.getElementById('client-note-input').value = db.clientNotes[name] || "";
             document.getElementById('client-phone-input').value = db.clientPhones[name] || (jobs[0] ? jobs[0].phone : "");
-
-            document.getElementById('mc-content').innerHTML = `
-                <h2 class="text-3xl font-black text-white uppercase mb-1">${name}</h2>
-                <p class="text-red-500 font-black text-xs uppercase mb-6 tracking-widest">Master Fleet Record</p>
+            document.getElementById('mc-content').innerHTML = `<h2 class="text-3xl font-black text-white uppercase mb-1">${name}</h2><p class="text-red-500 font-black text-xs uppercase mb-6 tracking-widest">Master Fleet Record</p>
                 <div class="space-y-6">${Object.entries(vehicles).map(([reg, v]) => `
                     <div class="bg-slate-800 rounded-3xl p-5 border border-slate-700 shadow-xl">
-                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
-                            <span class="text-xl font-black text-white uppercase">${reg}</span>
-                            <span class="text-xs font-bold text-slate-400 uppercase italic">${v.model}</span>
-                        </div>
-                        <div class="space-y-2">${v.history.sort((a,b)=>parseDate(b.date)-parseDate(a.date)).map(j => `
-                            <div class="flex justify-between items-center text-[11px] p-3 bg-slate-900 rounded-xl cursor-pointer hover:bg-slate-700 transition-colors" onclick="closeModal('client-modal');loadDoc('${j.id}')">
-                                <div class="flex gap-3 items-center">
-                                    <span class="${j.type==='QUOTE'?'badge-quote':'badge-inv'}">${j.type}</span>
-                                    <span class="text-slate-400 font-bold">${j.date}</span>
-                                </div>
-                                <b class="text-white font-black">${j.total}</b>
-                            </div>`).join('')}</div>
-                    </div>`).join('')}</div>`;
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700"><span class="text-xl font-black text-white uppercase">${reg}</span><span class="text-xs font-bold text-slate-400 uppercase italic">${v.model}</span></div>
+                        <div class="space-y-2">${v.history.sort((a,b)=>parseDate(b.date)-parseDate(a.date)).map(j => `<div class="flex justify-between items-center text-[11px] p-3 bg-slate-900 rounded-xl cursor-pointer hover:bg-slate-700 transition-colors" onclick="closeModal('client-modal');loadDoc('${j.id}')">
+                                <div class="flex gap-3 items-center"><span class="${j.type==='QUOTE'?'badge-quote':'badge-inv'}">${j.type}</span><span class="text-slate-400 font-bold">${j.date}</span></div>
+                                <b class="text-white font-black">${j.total}</b></div>`).join('')}</div></div>`).join('')}</div>`;
             document.getElementById('client-modal').classList.add('active');
         }
 
@@ -386,20 +374,20 @@
             rdb.ref('autotech_data').update(updates).then(() => { alert("Profile Updated"); renderClients(); });
         }
 
-        // EDITOR & CALCULATIONS
+        // EDITOR
         function addRow() {
             const tr = document.createElement('tr'); tr.className = "row-obj";
             tr.innerHTML = `
                 <td class="w-desc relative">
-                    <div contenteditable="true" class="font-black uppercase d-name-input text-black" onkeyup="handleRowSearch(this)">Service/Part</div>
-                    <div contenteditable="true" class="text-[7pt] d-desc-input italic">Details...</div>
+                    <div contenteditable="true" class="font-black uppercase d-name-input text-black" onfocus="if(this.innerText.includes('Service/Part')) this.innerText=''" onkeyup="handleRowSearch(this)">Service/Part</div>
+                    <div contenteditable="true" class="text-[7pt] d-desc-input italic" onfocus="if(this.innerText.includes('Details...')) this.innerText=''">Details...</div>
                     <div class="row-suggest suggestion-box hidden"></div>
                 </td>
                 <td class="w-price text-black" style="text-align:right"><span>$</span><span contenteditable="true" class="p-in">0.00</span></td>
-                <td class="w-qty text-black" contenteditable="true" style="text-align:center"><span class="q-in">1</span></td>
+                <td class="w-qty text-black" style="text-align:center"><span contenteditable="true" class="q-in">1</span></td>
                 <td class="w-total font-black l-in text-black" style="text-align:right">$0.00</td>
-                <td class="w-del no-print" style="text-align:center"><button onclick="this.closest('tr').remove();calc()" class="text-red-500 font-bold">✕</button></td>`;
-            document.getElementById('rows-target').appendChild(tr); calc();
+                <td class="w-del no-print" style="text-align:center"><button onclick="this.closest('tr').remove();debouncedCalc()" class="text-red-500 font-bold">✕</button></td>`;
+            document.getElementById('rows-target').appendChild(tr); debouncedCalc();
         }
 
         function handleRowSearch(el) {
@@ -414,16 +402,20 @@
 
         function selectRowItem(el, name, desc, price) {
             const tr = el.closest('tr'); tr.querySelector('.d-name-input').innerText = name; tr.querySelector('.d-desc-input').innerHTML = desc; tr.querySelector('.p-in').innerText = price;
-            tr.querySelector('.row-suggest').classList.add('hidden'); calc();
+            tr.querySelector('.row-suggest').classList.add('hidden'); debouncedCalc();
         }
 
         function calc() {
-            let sub = 0; document.querySelectorAll('.row-obj').forEach(r => { 
+            let sub = 0; 
+            document.querySelectorAll('.row-obj').forEach(r => { 
                 const p = parseFloat(r.querySelector('.p-in').innerText.replace(/[^0-9.-]+/g,"")) || 0; 
-                const q = parseFloat(r.querySelector('.q-in').innerText) || 1; 
-                sub += (p * q); r.querySelector('.l-in').innerText = fmt(p * q); 
+                const q = parseFloat(r.querySelector('.q-in').innerText) || 0; 
+                const total = p * q;
+                sub += total; 
+                r.querySelector('.l-in').innerText = fmt(total); 
             });
-            const disc = parseFloat(document.getElementById('fin-disc-amt').innerText) || 0; 
+            const discAmt = document.getElementById('fin-disc-amt');
+            const disc = discAmt ? (parseFloat(discAmt.innerText.replace(/[^0-9.-]+/g,"")) || 0) : 0; 
             const paid = activePays.reduce((a, b) => a + b.amt, 0);
             document.getElementById('fin-sub').innerText = fmt(sub); document.getElementById('fin-paid').innerText = fmt(paid); document.getElementById('fin-due').innerText = fmt(sub - disc - paid);
             document.getElementById('doc-type-display').innerText = document.getElementById('doc-toggle').value;
@@ -432,7 +424,7 @@
         function saveDoc() {
             const id = document.getElementById('doc-id').innerText;
             const doc = { id, type: document.getElementById('doc-toggle').value, date: document.getElementById('doc-date-display').innerText, client: document.getElementById('c-name').value.toUpperCase(), phone: document.getElementById('c-phone').innerText, reg: document.getElementById('v-reg').innerText.toUpperCase(), model: document.getElementById('v-model').innerText.toUpperCase(), mileage: document.getElementById('v-mile').innerText, notes: document.getElementById('job-notes').innerHTML, rows: document.getElementById('rows-target').innerHTML, total: document.getElementById('fin-sub').innerText, discount: document.getElementById('fin-disc-amt').innerText, payments: activePays };
-            if(!doc.client) return alert("Customer Name Required");
+            if(!doc.client || doc.client.includes('START TYPING')) return alert("Customer Name Required");
             let docs = [...db.docs]; const idx = docs.findIndex(x => x.id === id); if(idx > -1) docs[idx] = doc; else docs.push(doc);
             rdb.ref('autotech_data/docs').set(docs).then(() => showTab('dash'));
         }
@@ -440,7 +432,7 @@
         function loadDoc(id) {
             const i = db.docs.find(x => x.id === id); if(!i) return;
             document.getElementById('doc-id').innerText = i.id; document.getElementById('doc-date-display').innerText = i.date; document.getElementById('doc-toggle').value = i.type; document.getElementById('c-name').value = i.client; document.getElementById('c-phone').innerText = i.phone; document.getElementById('v-reg').innerText = i.reg; document.getElementById('v-model').innerText = i.model; document.getElementById('v-mile').innerText = i.mileage || '0 km'; document.getElementById('job-notes').innerHTML = i.notes; document.getElementById('rows-target').innerHTML = i.rows; document.getElementById('fin-disc-amt').innerText = i.discount || '0.00'; activePays = i.payments || [];
-            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); document.getElementById('del-btn').classList.remove('hidden'); showTab('editor'); calc();
+            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); document.getElementById('del-btn').classList.remove('hidden'); showTab('editor'); debouncedCalc();
         }
 
         function initNewDoc() {
@@ -452,7 +444,7 @@
             document.getElementById('v-reg').innerText = '---'; document.getElementById('v-model').innerText = '---';
             document.getElementById('v-mile').innerText = '0 km'; document.getElementById('job-notes').innerHTML = '...';
             document.getElementById('fin-disc-amt').innerText = '0.00';
-            document.getElementById('del-btn').classList.add('hidden'); addRow(); showTab('editor'); calc();
+            document.getElementById('del-btn').classList.add('hidden'); addRow(); showTab('editor'); debouncedCalc();
         }
 
         function renderDashboard() {
@@ -468,12 +460,12 @@
             html2pdf().set(opt).from(document.getElementById('pdf-area')).save();
         }
 
-        // UTILITIES
+        // UTILS
         function parseDate(s) { if(!s) return new Date(0); const p = s.split('/'); return new Date(p[2], p[1]-1, p[0]); }
         function showTab(id) { document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden')); document.getElementById('view-' + id).classList.remove('hidden'); document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active')); if(document.getElementById('tab-'+id)) document.getElementById('tab-'+id).classList.add('active'); }
         function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; calc(); }
+        function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; debouncedCalc(); }
         function deleteDoc() { if(confirm("Delete?")) { const updated = db.docs.filter(d => d.id !== document.getElementById('doc-id').innerText); rdb.ref('autotech_data/docs').set(updated).then(() => showTab('dash')); } }
         
         // INVENTORY
@@ -481,19 +473,8 @@
             const idx = parseInt(document.getElementById('inv-edit-idx').value);
             const name = document.getElementById('inv-name').value.trim();
             const item = { name, desc: document.getElementById('inv-desc').value.replace(/\n/g, '<br>'), price: parseFloat(document.getElementById('inv-price').value) || 0 };
-            
             if(!item.name) return;
-
-            // DUPLICATE CHECK logic
-            const isDuplicate = db.inventory.some((existing, i) => {
-                return i !== idx && existing.name.toLowerCase() === item.name.toLowerCase();
-            });
-
-            if(isDuplicate) {
-                alert(`STOP: "${item.name}" already exists in your database. Please edit the existing item or use a different name.`);
-                return;
-            }
-
+            if(db.inventory.some((existing, i) => i !== idx && existing.name.toLowerCase() === item.name.toLowerCase())) { alert("Item Exists."); return; }
             let updated = [...db.inventory]; if(idx > -1) updated[idx] = item; else updated.push(item);
             rdb.ref('autotech_data/inventory').set(updated).then(() => cancelInvEdit());
         }
@@ -502,18 +483,13 @@
             const q = (document.getElementById('inv-search').value || "").toLowerCase();
             let list = db.inventory.map((item, originalIdx) => ({...item, originalIdx})).sort((a,b) => a.name.localeCompare(b.name));
             if(q) list = list.filter(i => i.name.toLowerCase().includes(q));
-            document.getElementById('inventory-list').innerHTML = list.map(item => `
-                <tr class="hover:bg-slate-800 text-white">
-                    <td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td>
-                    <td class="p-4 font-black">${fmt(item.price)}</td>
-                    <td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td>
-                </tr>`).join('');
+            document.getElementById('inventory-list').innerHTML = list.map(item => `<tr class="hover:bg-slate-800 text-white"><td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td><td class="p-4 font-black">${fmt(item.price)}</td><td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td></tr>`).join('');
         }
-        function editInv(idx) { const i = db.inventory[idx]; document.getElementById('inv-edit-idx').value = idx; document.getElementById('inv-name').value = i.name; document.getElementById('inv-desc').value = i.desc.replace(/<br>/g, '\n'); document.getElementById('inv-price').value = i.price; document.getElementById('inv-form-title').innerText = "Edit Database Item"; document.getElementById('inv-save-btn').innerText = "Update"; document.getElementById('inv-cancel-btn').classList.remove('hidden'); }
-        function cancelInvEdit() { document.getElementById('inv-edit-idx').value = "-1"; document.getElementById('inv-name').value = ''; document.getElementById('inv-desc').value = ''; document.getElementById('inv-price').value = ''; document.getElementById('inv-form-title').innerText = "Service Database Manager"; document.getElementById('inv-save-btn').innerText = "Save Item"; document.getElementById('inv-cancel-btn').classList.add('hidden'); }
+        function editInv(idx) { const i = db.inventory[idx]; document.getElementById('inv-edit-idx').value = idx; document.getElementById('inv-name').value = i.name; document.getElementById('inv-desc').value = i.desc.replace(/<br>/g, '\n'); document.getElementById('inv-price').value = i.price; document.getElementById('inv-form-title').innerText = "Edit Item"; document.getElementById('inv-save-btn').innerText = "Update"; document.getElementById('inv-cancel-btn').classList.remove('hidden'); }
+        function cancelInvEdit() { document.getElementById('inv-edit-idx').value = "-1"; document.getElementById('inv-name').value = ''; document.getElementById('inv-desc').value = ''; document.getElementById('inv-price').value = ''; document.getElementById('inv-form-title').innerText = "Service Database"; document.getElementById('inv-save-btn').innerText = "Save Item"; document.getElementById('inv-cancel-btn').classList.add('hidden'); }
         function deleteInv(idx) { if(confirm("Delete?")) { const updated = db.inventory.filter((_, i) => i !== idx); rdb.ref('autotech_data/inventory').set(updated); } }
 
-        // SETTINGS & LOGO
+        // SETTINGS
         function saveSettings() { const s = { n1: document.getElementById('set-n1').value, slogan: document.getElementById('set-slogan').value, addr: document.getElementById('set-addr').value, ph: document.getElementById('set-ph').value, logo: curLogo }; rdb.ref('autotech_data/settings').set(s).then(() => alert("Saved")); }
         function applySettings() {
             const s = db.settings || {}; 
@@ -528,10 +504,10 @@
 
         // PAYMENTS
         function openPayModal() { document.getElementById('pay-date').value = new Date().toISOString().split('T')[0]; renderPayHistory(); document.getElementById('pay-modal').classList.add('active'); }
-        function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; if(v > 0) { activePays.push({ amt: v, date: document.getElementById('pay-date').value.split('-').reverse().join('/'), method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); calc(); } }
-        function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1 text-slate-900"><span>${p.date} (${p.method})</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();calc()">✕</button></div>`).join(''); }
+        function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; if(v > 0) { activePays.push({ amt: v, date: document.getElementById('pay-date').value.split('-').reverse().join('/'), method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); debouncedCalc(); } }
+        function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1 text-slate-900"><span>${p.date} (${p.method})</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();debouncedCalc()">✕</button></div>`).join(''); }
 
-        document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) calc(); });
+        document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) debouncedCalc(); });
         window.onclick = (e) => { if(!e.target.closest('.relative')) document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
     </script>
 </body>

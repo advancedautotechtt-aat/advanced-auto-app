@@ -319,18 +319,33 @@
         });
         observer.observe(document.getElementById('rows-target'), { childList: true, subtree: true, characterData: true });
 
-        // SUGGESTIONS & AUTOFILL
+        // SUGGESTIONS & AUTOFILL (FIXED: Added structural sanitization safety checks for historical fallback entries)
         function showSuggestions(el, type) {
             const val = el.innerText ? el.innerText.toUpperCase() : el.value.toUpperCase();
             const box = document.getElementById('s-' + type);
             if (val.length < 1) { box.classList.add('hidden'); return; }
 
             const uniqueEntries = new Map();
-            Object.values(db.docs).forEach(d => {
-                let matchVal = (type === 'client') ? d.client : (type === 'reg' ? d.reg : d.model);
+            Object.keys(db.docs).forEach(key => {
+                let d = db.docs[key];
+                if (!d) return;
+                let clientStr = d.client ? String(d.client) : '';
+                let regStr = d.reg ? String(d.reg) : '';
+                let modelStr = d.model ? String(d.model) : '';
+
+                let matchVal = (type === 'client') ? clientStr : (type === 'reg' ? regStr : modelStr);
                 if (matchVal && matchVal.toUpperCase().includes(val)) {
-                    const key = type === 'client' ? `${d.client}-${d.reg}` : matchVal;
-                    if (!uniqueEntries.has(key)) uniqueEntries.set(key, d);
+                    const lookupKey = type === 'client' ? `${clientStr}-${regStr}` : matchVal;
+                    if (!uniqueEntries.has(lookupKey)) {
+                        // Secure a complete layout structure for historical records missing attributes
+                        uniqueEntries.set(lookupKey, {
+                            id: d.id || key,
+                            client: clientStr || 'UNKNOWN',
+                            reg: regStr || '---',
+                            model: modelStr || '---',
+                            phone: d.phone || 'PHONE NO.'
+                        });
+                    }
                 }
             });
 
@@ -345,18 +360,23 @@
         }
 
         function applyAutofill(id, type) {
-            const m = db.docs[id];
+            // FIXED: Scan database values dynamically if historical key mismatch exists
+            let m = db.docs[id];
+            if (!m) {
+                m = Object.values(db.docs).find(d => d && (d.id === id || String(d.id) === String(id)));
+            }
             if (!m) return;
+            
             if(type === 'client') {
-                document.getElementById('c-name').value = m.client;
-                document.getElementById('c-phone').innerText = m.phone;
-                document.getElementById('v-reg').innerText = m.reg;
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('c-name').value = m.client || '';
+                document.getElementById('c-phone').innerText = m.phone || 'PHONE NO.';
+                document.getElementById('v-reg').innerText = m.reg || '---';
+                document.getElementById('v-model').innerText = m.model || '---';
             } else if(type === 'reg') {
-                document.getElementById('v-reg').innerText = m.reg;
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('v-reg').innerText = m.reg || '---';
+                document.getElementById('v-model').innerText = m.model || '---';
             } else if(type === 'model') {
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('v-model').innerText = m.model || '---';
             }
             document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
             debouncedCalc();
@@ -398,7 +418,7 @@
 
         function viewFleetHistory(name) {
             currentClientViewing = name;
-            const jobs = Object.values(db.docs).filter(d => d.client.toUpperCase() === name.toUpperCase());
+            const jobs = Object.values(db.docs).filter(d => d.client && d.client.toUpperCase() === name.toUpperCase());
             const vehicles = {}; 
             jobs.forEach(j => { const r = (j.reg || 'NO-REG').toUpperCase(); if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; vehicles[r].history.push(j); });
             document.getElementById('client-note-input').value = db.clientNotes[name] || "";
@@ -475,10 +495,31 @@
             rdb.ref('autotech_data/docs/' + id).set(doc).then(() => showTab('dash'));
         }
 
+        // FIXED: Gracefully fallback layout search to scan record content if historical key mismatches exist
         function loadDoc(id) {
-            const i = db.docs[id]; if(!i) return;
-            document.getElementById('doc-id').innerText = i.id; document.getElementById('doc-date-display').innerText = i.date; document.getElementById('doc-toggle').value = i.type; document.getElementById('c-name').value = i.client; document.getElementById('c-phone').innerText = i.phone; document.getElementById('v-reg').innerText = i.reg; document.getElementById('v-model').innerText = i.model; document.getElementById('v-mile').innerText = i.mileage || '0 KM'; document.getElementById('job-notes').innerHTML = i.notes; document.getElementById('rows-target').innerHTML = i.rows; document.getElementById('fin-disc-amt').innerText = i.discount || '0.00'; activePays = i.payments || [];
-            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); document.getElementById('del-btn').classList.remove('hidden'); showTab('editor'); debouncedCalc();
+            let i = db.docs[id]; 
+            if(!i) {
+                i = Object.values(db.docs).find(d => d && (d.id === id || String(d.id) === String(id)));
+            }
+            if(!i) return alert("Error: Could not locate document record " + id);
+
+            document.getElementById('doc-id').innerText = i.id || id; 
+            document.getElementById('doc-date-display').innerText = i.date || ''; 
+            document.getElementById('doc-toggle').value = i.type || 'INVOICE'; 
+            document.getElementById('c-name').value = i.client || ''; 
+            document.getElementById('c-phone').innerText = i.phone || 'PHONE NO.'; 
+            document.getElementById('v-reg').innerText = i.reg || '---'; 
+            document.getElementById('v-model').innerText = i.model || '---'; 
+            document.getElementById('v-mile').innerText = i.mileage || '0 KM'; 
+            document.getElementById('job-notes').innerHTML = i.notes || '...'; 
+            document.getElementById('rows-target').innerHTML = i.rows || ''; 
+            document.getElementById('fin-disc-amt').innerText = i.discount || '0.00'; 
+            activePays = i.payments || [];
+            
+            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); 
+            document.getElementById('del-btn').classList.remove('hidden'); 
+            showTab('editor'); 
+            debouncedCalc();
         }
 
         function initNewDoc() {
@@ -496,14 +537,54 @@
             document.getElementById('del-btn').classList.add('hidden'); addRow(); showTab('editor'); debouncedCalc();
         }
 
+        // FIXED: Enforce accurate descending numeric sort sequence and chronological fallback filtering across all mismatched index variants
         function renderDashboard() {
             const q = (document.getElementById('dash-search').value || "").toLowerCase();
             let rev = 0, qTot = 0; 
-            Object.values(db.docs).forEach(i => { const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0; if(i.type === 'INVOICE') rev += t; else if(i.type === 'QUOTE') qTot += t; });
-            document.getElementById('stat-rev').innerText = fmt(rev); document.getElementById('stat-quote').innerText = fmt(qTot);
             
-            const filtered = Object.values(db.docs).slice().reverse().filter(i => (i.client||'').toLowerCase().includes(q) || (i.reg||'').toLowerCase().includes(q) || (i.id||'').includes(q));
-            document.getElementById('dash-list').innerHTML = filtered.map(i => `<tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.id}')"><td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td><td class="p-5 text-slate-400 text-[10px]">${i.date}</td><td class="p-5 font-bold uppercase">${i.client}<br><span class="text-red-500 text-[9px] font-black">${i.reg}</span></td><td class="p-5 text-right font-black">${i.total}</td></tr>`).join('');
+            // Build safe runtime map collection array with key definitions preserved
+            const processedList = Object.keys(db.docs).map(key => {
+                let item = db.docs[key];
+                return {
+                    dbKey: key,
+                    id: item.id || key,
+                    type: item.type || 'INVOICE',
+                    date: item.date || '01/01/2025',
+                    client: item.client || 'UNKNOWN',
+                    reg: item.reg || '---',
+                    total: item.total || '$0.00'
+                };
+            });
+
+            processedList.forEach(i => { 
+                const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0; 
+                if(i.type === 'INVOICE') rev += t; 
+                else if(i.type === 'QUOTE') qTot += t; 
+            });
+            document.getElementById('stat-rev').innerText = fmt(rev); 
+            document.getElementById('stat-quote').innerText = fmt(qTot);
+            
+            // Sort strictly descending by numeric id format value first, then fallback to real calendar date
+            processedList.sort((a, b) => {
+                let idA = parseInt(a.id) || 0;
+                let idB = parseInt(b.id) || 0;
+                if (idA !== idB) return idB - idA;
+                return parseDate(b.date) - parseDate(a.date);
+            });
+
+            const filtered = processedList.filter(i => 
+                i.client.toLowerCase().includes(q) || 
+                i.reg.toLowerCase().includes(q) || 
+                String(i.id).includes(q)
+            );
+
+            document.getElementById('dash-list').innerHTML = filtered.map(i => `
+                <tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.dbKey}')">
+                    <td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td>
+                    <td class="p-5 text-slate-400 text-[10px]">${i.date}</td>
+                    <td class="p-5 font-bold uppercase">${i.client}<br><span class="text-red-500 text-[9px] font-black">${i.reg}</span></td>
+                    <td class="p-5 text-right font-black">${i.total}</td>
+                </tr>`).join('');
         }
 
         function downloadPDF() {

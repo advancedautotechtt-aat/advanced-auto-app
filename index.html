@@ -308,9 +308,24 @@
         });
         observer.observe(document.getElementById('rows-target'), { childList: true, subtree: true, characterData: true });
 
-        // SUGGESTIONS & AUTOFILL
+        // Helper function to find a document safely matching string or numerical IDs
+        function findDocById(id) {
+            if (!id) return null;
+            const cleanId = id.toString().trim();
+            if (db.docs[cleanId]) return db.docs[cleanId];
+            
+            // Safe fallback loop to check alternate formats (unpadded vs padded)
+            const numericId = parseInt(cleanId, 10);
+            const found = Object.values(db.docs).find(d => {
+                const checkId = d.id ? d.id.toString().trim() : '';
+                return checkId === cleanId || (isNaN(numericId) ? false : parseInt(checkId, 10) === numericId);
+            });
+            return found || null;
+        }
+
+        // SUGGESTIONS & AUTOFILL (Fixed query matching to grab custom fields cleanly from historical data objects)
         function showSuggestions(el, type) {
-            const val = el.innerText ? el.innerText.toUpperCase() : el.value.toUpperCase();
+            const val = el.innerText ? el.innerText.toUpperCase().trim() : el.value.toUpperCase().trim();
             const box = document.getElementById('s-' + type);
             if (val.length < 1) { box.classList.add('hidden'); return; }
 
@@ -318,34 +333,44 @@
             Object.values(db.docs).forEach(d => {
                 let matchVal = (type === 'client') ? d.client : (type === 'reg' ? d.reg : d.model);
                 if (matchVal && matchVal.toUpperCase().includes(val)) {
-                    const key = type === 'client' ? `${d.client}-${d.reg}` : matchVal;
+                    // Create composite key unique to entry data to prevent repetition
+                    const key = type === 'client' ? `${(d.client || '').toUpperCase()}-${(d.reg || '').toUpperCase()}` : matchVal.toUpperCase();
                     if (!uniqueEntries.has(key)) uniqueEntries.set(key, d);
                 }
             });
 
             if (uniqueEntries.size > 0) {
-                box.innerHTML = Array.from(uniqueEntries.values()).map(m => `
-                    <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}')">
-                        <div class="font-black text-[12px] uppercase">${type === 'client' ? m.client : (type === 'reg' ? m.reg : m.model)}</div>
-                        ${type === 'client' ? `<div class="text-[10px] text-red-600 font-bold">${m.reg} — ${m.model}</div>` : ''}
-                    </div>`).join('');
+                box.innerHTML = Array.from(uniqueEntries.values()).map(m => {
+                    const displayValue = type === 'client' ? m.client : (type === 'reg' ? m.reg : m.model);
+                    return `
+                    <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}', '${btoa(encodeURIComponent(JSON.stringify(m)))}')">
+                        <div class="font-black text-[12px] uppercase">${displayValue}</div>
+                        ${type === 'client' ? `<div class="text-[10px] text-red-600 font-bold">${m.reg || '---'} — ${m.model || '---'}</div>` : ''}
+                    </div>`;
+                }).join('');
                 box.classList.remove('hidden');
             } else box.classList.add('hidden');
         }
 
-        function applyAutofill(id, type) {
-            const m = db.docs[id];
+        function applyAutofill(id, type, backupDataRaw) {
+            // Retrieve data matching id index, fallback to parsing attached serialized stream if historical lookups fail
+            let m = findDocById(id);
+            if (!m && backupDataRaw) {
+                try { m = JSON.parse(decodeURIComponent(atob(backupDataRaw))); } catch(e) { console.error(e); }
+            }
             if (!m) return;
+            
             if(type === 'client') {
-                document.getElementById('c-name').value = m.client;
-                document.getElementById('c-phone').innerText = m.phone;
-                document.getElementById('v-reg').innerText = m.reg;
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('c-name').value = m.client || '';
+                document.getElementById('c-phone').innerText = m.phone || db.clientPhones[m.client] || 'PHONE NO.';
+                document.getElementById('v-reg').innerText = m.reg || '---';
+                document.getElementById('v-model').innerText = m.model || '---';
+                if(m.mileage) document.getElementById('v-mile').innerText = m.mileage;
             } else if(type === 'reg') {
-                document.getElementById('v-reg').innerText = m.reg;
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('v-reg').innerText = m.reg || '---';
+                document.getElementById('v-model').innerText = m.model || '---';
             } else if(type === 'model') {
-                document.getElementById('v-model').innerText = m.model;
+                document.getElementById('v-model').innerText = m.model || '---';
             }
             document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
             debouncedCalc();
@@ -357,11 +382,11 @@
             const sortBy = document.getElementById('dir-sort').value;
             const clients = {}; 
             Object.values(db.docs).forEach(d => { 
-                const n = (d.client || 'UNKNOWN').toUpperCase(); 
+                const n = (d.client || 'UNKNOWN').toUpperCase().trim(); 
                 if(!clients[n]) clients[n] = { name: n, spend: 0, visits: 0, vehicles: new Set(), last: d.date, phone: db.clientPhones[n] || d.phone || 'NO PHONE' };
                 const amt = parseFloat(d.total.replace(/[^0-9.-]+/g,"")) || 0;
                 if(d.type === 'INVOICE') clients[n].spend += amt;
-                if(d.reg) clients[n].vehicles.add(`${d.reg} (${d.model})`);
+                if(d.reg) clients[n].vehicles.add(`${d.reg.toUpperCase()} (${d.model || '---'})`);
                 clients[n].visits++;
                 if(parseDate(d.date) > parseDate(clients[n].last)) clients[n].last = d.date;
             });
@@ -387,15 +412,15 @@
 
         function viewFleetHistory(name) {
             currentClientViewing = name;
-            const jobs = Object.values(db.docs).filter(d => d.client.toUpperCase() === name.toUpperCase());
+            const jobs = Object.values(db.docs).filter(d => d.client && d.client.toUpperCase().trim() === name.toUpperCase().trim());
             const vehicles = {}; 
-            jobs.forEach(j => { const r = (j.reg || 'NO-REG').toUpperCase(); if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; vehicles[r].history.push(j); });
+            jobs.forEach(j => { const r = (j.reg || 'NO-REG').toUpperCase().trim(); if(!vehicles[r]) vehicles[r] = { model: j.model, history: [] }; vehicles[r].history.push(j); });
             document.getElementById('client-note-input').value = db.clientNotes[name] || "";
             document.getElementById('client-phone-input').value = db.clientPhones[name] || (jobs[0] ? jobs[0].phone : "");
             document.getElementById('mc-content').innerHTML = `<h2 class="text-3xl font-black text-white uppercase mb-1">${name}</h2><p class="text-red-500 font-black text-xs uppercase mb-6 tracking-widest">Master Fleet Record</p>
                 <div class="space-y-6">${Object.entries(vehicles).map(([reg, v]) => `
                     <div class="bg-slate-800 rounded-3xl p-5 border border-slate-700 shadow-xl">
-                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700"><span class="text-xl font-black text-white uppercase">${reg}</span><span class="text-xs font-bold text-slate-400 uppercase italic">${v.model}</span></div>
+                        <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700"><span class="text-xl font-black text-white uppercase">${reg}</span><span class="text-xs font-bold text-slate-400 uppercase italic">${v.model || '---'}</span></div>
                         <div class="space-y-2">${v.history.sort((a,b)=>parseDate(b.date)-parseDate(a.date)).map(j => `<div class="flex justify-between items-center text-[11px] p-3 bg-slate-900 rounded-xl cursor-pointer hover:bg-slate-700 transition-colors" onclick="closeModal('client-modal');loadDoc('${j.id}')">
                                 <div class="flex gap-3 items-center"><span class="${j.type==='QUOTE'?'badge-quote':'badge-inv'}">${j.type}</span><span class="text-slate-400 font-bold">${j.date}</span></div>
                                 <b class="text-white font-black">${j.total}</b></div>`).join('')}</div></div>`).join('')}</div>`;
@@ -457,17 +482,34 @@
         }
 
         function saveDoc() {
-            const id = document.getElementById('doc-id').innerText;
-            const doc = { id, type: document.getElementById('doc-toggle').value, date: document.getElementById('doc-date-display').innerText, client: document.getElementById('c-name').value.toUpperCase(), phone: document.getElementById('c-phone').innerText, reg: document.getElementById('v-reg').innerText.toUpperCase(), model: document.getElementById('v-model').innerText.toUpperCase(), mileage: document.getElementById('v-mile').innerText, notes: document.getElementById('job-notes').innerHTML, rows: document.getElementById('rows-target').innerHTML, total: document.getElementById('fin-sub').innerText, discount: document.getElementById('fin-disc-amt').innerText, payments: activePays };
+            const id = document.getElementById('doc-id').innerText.trim();
+            const doc = { id, type: document.getElementById('doc-toggle').value, date: document.getElementById('doc-date-display').innerText, client: document.getElementById('c-name').value.toUpperCase().trim(), phone: document.getElementById('c-phone').innerText, reg: document.getElementById('v-reg').innerText.toUpperCase().trim(), model: document.getElementById('v-model').innerText.toUpperCase().trim(), mileage: document.getElementById('v-mile').innerText, notes: document.getElementById('job-notes').innerHTML, rows: document.getElementById('rows-target').innerHTML, total: document.getElementById('fin-sub').innerText, discount: document.getElementById('fin-disc-amt').innerText, payments: activePays };
             if(!doc.client || doc.client.includes('START TYPING')) return alert("Customer Name Required");
             
             rdb.ref('autotech_data/docs/' + id).set(doc).then(() => showTab('dash'));
         }
 
         function loadDoc(id) {
-            const i = db.docs[id]; if(!i) return;
-            document.getElementById('doc-id').innerText = i.id; document.getElementById('doc-date-display').innerText = i.date; document.getElementById('doc-toggle').value = i.type; document.getElementById('c-name').value = i.client; document.getElementById('c-phone').innerText = i.phone; document.getElementById('v-reg').innerText = i.reg; document.getElementById('v-model').innerText = i.model; document.getElementById('v-mile').innerText = i.mileage || '0 KM'; document.getElementById('job-notes').innerHTML = i.notes; document.getElementById('rows-target').innerHTML = i.rows; document.getElementById('fin-disc-amt').innerText = i.discount || '0.00'; activePays = i.payments || [];
-            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); document.getElementById('del-btn').classList.remove('hidden'); showTab('editor'); debouncedCalc();
+            const i = findDocById(id); 
+            if(!i) return alert("Error: Invoice record could not be loaded from database.");
+            
+            document.getElementById('doc-id').innerText = i.id; 
+            document.getElementById('doc-date-display').innerText = i.date; 
+            document.getElementById('doc-toggle').value = i.type; 
+            document.getElementById('c-name').value = i.client || ''; 
+            document.getElementById('c-phone').innerText = i.phone || db.clientPhones[i.client] || 'PHONE NO.'; 
+            document.getElementById('v-reg').innerText = i.reg || '---'; 
+            document.getElementById('v-model').innerText = i.model || '---'; 
+            document.getElementById('v-mile').innerText = i.mileage || '0 KM'; 
+            document.getElementById('job-notes').innerHTML = i.notes || '...'; 
+            document.getElementById('rows-target').innerHTML = i.rows || ''; 
+            document.getElementById('fin-disc-amt').innerText = i.discount || '0.00'; 
+            activePays = i.payments || [];
+            
+            document.getElementById('convert-btn').classList.toggle('hidden', i.type !== "QUOTE"); 
+            document.getElementById('del-btn').classList.remove('hidden'); 
+            showTab('editor'); 
+            debouncedCalc();
         }
 
         function initNewDoc() {
@@ -486,13 +528,19 @@
         }
 
         function renderDashboard() {
-            const q = (document.getElementById('dash-search').value || "").toLowerCase();
+            const q = (document.getElementById('dash-search').value || "").toLowerCase().trim();
             let rev = 0, qTot = 0; 
             Object.values(db.docs).forEach(i => { const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0; if(i.type === 'INVOICE') rev += t; else if(i.type === 'QUOTE') qTot += t; });
             document.getElementById('stat-rev').innerText = fmt(rev); document.getElementById('stat-quote').innerText = fmt(qTot);
             
-            const filtered = Object.values(db.docs).slice().reverse().filter(i => (i.client||'').toLowerCase().includes(q) || (i.reg||'').toLowerCase().includes(q) || (i.id||'').includes(q));
-            document.getElementById('dash-list').innerHTML = filtered.map(i => `<tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.id}')"><td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td><td class="p-5 text-slate-400 text-[10px]">${i.date}</td><td class="p-5 font-bold uppercase">${i.client}<br><span class="text-red-500 text-[9px] font-black">${i.reg}</span></td><td class="p-5 text-right font-black">${i.total}</td></tr>`).join('');
+            const filtered = Object.values(db.docs).slice().reverse().filter(i => {
+                const checkClient = (i.client || '').toLowerCase();
+                const checkReg = (i.reg || '').toLowerCase();
+                const checkId = (i.id || '').toString().toLowerCase();
+                return checkClient.includes(q) || checkReg.includes(q) || checkId.includes(q);
+            });
+            
+            document.getElementById('dash-list').innerHTML = filtered.map(i => `<tr class="hover:bg-slate-800 cursor-pointer" onclick="loadDoc('${i.id}')"><td class="p-5"><span class="${i.type==='QUOTE'?'badge-quote':'badge-inv'}">${i.type}</span></td><td class="p-5 text-slate-400 text-[10px]">${i.date}</td><td class="p-5 font-bold uppercase">${i.client || 'UNKNOWN'}<br><span class="text-red-500 text-[9px] font-black">${i.reg || '---'}</span></td><td class="p-5 text-right font-black">${i.total}</td></tr>`).join('');
         }
 
         function downloadPDF() {
@@ -522,7 +570,7 @@
         function fmt(n) { return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2}); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         function convertToInvoice() { document.getElementById('doc-toggle').value = "INVOICE"; debouncedCalc(); }
-        function deleteDoc() { if(confirm("Delete?")) { rdb.ref('autotech_data/docs/' + document.getElementById('doc-id').innerText).remove().then(() => showTab('dash')); } }
+        function deleteDoc() { if(confirm("Delete?")) { rdb.ref('autotech_data/docs/' + document.getElementById('doc-id').innerText.trim()).remove().then(() => showTab('dash')); } }
         
         // INVENTORY
         function saveInventory() {

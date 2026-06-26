@@ -34,16 +34,13 @@
         .nav-btn.active { background: #1e293b; color: white; border-left-color: var(--brand-red); }
         .main-content { flex-grow: 1; overflow-y: auto; background: #1e293b; scroll-behavior: smooth; }
 
-        /* FIXED: Added a printing override framework to compact rows if content overflows */
         #pdf-area { width: 750px; min-height: 1050px; background: white; padding: 45px; color: #1e293b; display: flex; flex-direction: column; position: relative; box-sizing: border-box; }
         .pdf-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 10px; }
         .pdf-table th { background: #0f172a; color: white; font-size: 10px; padding: 12px 8px; text-transform: uppercase; }
         .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #cbd5e1; font-size: 12px; vertical-align: top; word-wrap: break-word; line-height: 1.4; color: #000; transition: padding 0.2s ease; }
         
-        /* FIXED: Prevent breakdown splitting layout styles */
         .avoid-break { page-break-inside: avoid; break-inside: avoid; }
 
-        /* FIXED: When the class html2pdf__page-value is injected during building, tighten elements */
         .html2pdf__container #pdf-area { min-height: auto !important; padding: 30px !important; }
         .html2pdf__container .pdf-table td { padding: 6px 8px !important; font-size: 11px !important; }
         .html2pdf__container .pdf-table th { padding: 8px 8px !important; }
@@ -155,7 +152,7 @@
                             <div id="s-model" class="suggestion-box hidden text-left right-0"></div>
                             <div class="font-bold text-[10pt]">Reg. No: <span contenteditable="true" id="v-reg" onfocus="if(this.innerText.trim() === '---') this.innerText=''" oninput="showSuggestions(this, 'reg')" class="font-black text-red-600 uppercase">---</span></div>
                             <div id="s-reg" class="suggestion-box hidden text-left right-0"></div>
-                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" onfocus="if(this.innerText.toLowerCase().includes('0 km')) this.innerText=''" class="font-bold">0 KM</span></div>
+                            <div class="font-bold text-[10pt]">Mileage: <span contenteditable="true" id="v-mile" onfocus="if(this.innerText.toLowerCase().includes('0 km')) this.innerText=''" onblur="formatMileageInput(this)" class="font-bold">0 KM</span></div>
                         </div>
                     </div>
 
@@ -319,12 +316,32 @@
         });
         observer.observe(document.getElementById('rows-target'), { childList: true, subtree: true, characterData: true });
 
-        // SUGGESTIONS & AUTOFILL (FIXED: Added structural sanitization safety checks for historical fallback entries)
+        // SUGGESTIONS ENGINE WITH CONDITIONAL AUTOFILL ROUTING
         function showSuggestions(el, type) {
             const val = el.innerText ? el.innerText.toUpperCase() : el.value.toUpperCase();
             const box = document.getElementById('s-' + type);
             if (val.length < 1) { box.classList.add('hidden'); return; }
 
+            if (type === 'model') {
+                // Keep model matching clean and layout simple (Original Style)
+                const uniqueModels = new Set();
+                Object.values(db.docs).forEach(d => {
+                    if (d && d.model && d.model.toUpperCase().includes(val)) {
+                        uniqueModels.add(d.model.toUpperCase());
+                    }
+                });
+
+                if (uniqueModels.size > 0) {
+                    box.innerHTML = Array.from(uniqueModels).map(m => `
+                        <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100 font-black text-[12px] uppercase" onclick="applyAutofill('', 'model', '${m.replace(/'/g, "\\'")}')">
+                            ${m}
+                        </div>`).join('');
+                    box.classList.remove('hidden');
+                } else box.classList.add('hidden');
+                return;
+            }
+
+            // Client Name and Registration handling retains the smart metadata cards
             const uniqueEntries = new Map();
             Object.keys(db.docs).forEach(key => {
                 let d = db.docs[key];
@@ -333,11 +350,10 @@
                 let regStr = d.reg ? String(d.reg) : '';
                 let modelStr = d.model ? String(d.model) : '';
 
-                let matchVal = (type === 'client') ? clientStr : (type === 'reg' ? regStr : modelStr);
+                let matchVal = (type === 'client') ? clientStr : regStr;
                 if (matchVal && matchVal.toUpperCase().includes(val)) {
-                    const lookupKey = type === 'client' ? `${clientStr}-${regStr}` : matchVal;
+                    const lookupKey = type === 'client' ? `${clientStr}-${regStr}` : regStr;
                     if (!uniqueEntries.has(lookupKey)) {
-                        // Secure a complete layout structure for historical records missing attributes
                         uniqueEntries.set(lookupKey, {
                             id: d.id || key,
                             client: clientStr || 'UNKNOWN',
@@ -350,36 +366,49 @@
             });
 
             if (uniqueEntries.size > 0) {
-                box.innerHTML = Array.from(uniqueEntries.values()).map(m => `
-                    <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}')">
-                        <div class="font-black text-[12px] uppercase">${type === 'client' ? m.client : (type === 'reg' ? m.reg : m.model)}</div>
-                        ${type === 'client' ? `<div class="text-[10px] text-red-600 font-bold">${m.reg} — ${m.model}</div>` : ''}
-                    </div>`).join('');
+                box.innerHTML = Array.from(uniqueEntries.values()).map(m => {
+                    let displayTitle = type === 'client' ? m.client : m.reg;
+                    let displaySub = type === 'client' ? `${m.reg} — ${m.model}` : `${m.client} — ${m.model}`;
+                    
+                    return `
+                    <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}', '')">
+                        <div class="font-black text-[12px] uppercase">${displayTitle}</div>
+                        <div class="text-[10px] text-red-600 font-bold">${displaySub}</div>
+                    </div>`;
+                }).join('');
                 box.classList.remove('hidden');
             } else box.classList.add('hidden');
         }
 
-        function applyAutofill(id, type) {
-            // FIXED: Scan database values dynamically if historical key mismatch exists
-            let m = db.docs[id];
-            if (!m) {
-                m = Object.values(db.docs).find(d => d && (d.id === id || String(d.id) === String(id)));
-            }
-            if (!m) return;
-            
-            if(type === 'client') {
+        function applyAutofill(id, type, exactModelValue) {
+            if (type === 'model') {
+                document.getElementById('v-model').innerText = exactModelValue || '---';
+            } else {
+                let m = db.docs[id];
+                if (!m) {
+                    m = Object.values(db.docs).find(d => d && (d.id === id || String(d.id) === String(id)));
+                }
+                if (!m) return;
+                
                 document.getElementById('c-name').value = m.client || '';
                 document.getElementById('c-phone').innerText = m.phone || 'PHONE NO.';
                 document.getElementById('v-reg').innerText = m.reg || '---';
                 document.getElementById('v-model').innerText = m.model || '---';
-            } else if(type === 'reg') {
-                document.getElementById('v-reg').innerText = m.reg || '---';
-                document.getElementById('v-model').innerText = m.model || '---';
-            } else if(type === 'model') {
-                document.getElementById('v-model').innerText = m.model || '---';
             }
+            
             document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden'));
             debouncedCalc();
+        }
+
+        // MILEAGE FORMATTER ENGINE
+        function formatMileageInput(el) {
+            let raw = el.innerText.toUpperCase().replace(/KM/g, '').replace(/[^0-9]/g, '').trim();
+            if (raw === '' || isNaN(raw)) {
+                el.innerText = '0 KM';
+                return;
+            }
+            let numericVal = parseInt(raw, 10);
+            el.innerText = numericVal.toLocaleString('en-US') + ' KM';
         }
 
         // FLEET DIRECTORY
@@ -495,7 +524,6 @@
             rdb.ref('autotech_data/docs/' + id).set(doc).then(() => showTab('dash'));
         }
 
-        // FIXED: Gracefully fallback layout search to scan record content if historical key mismatches exist
         function loadDoc(id) {
             let i = db.docs[id]; 
             if(!i) {
@@ -537,12 +565,10 @@
             document.getElementById('del-btn').classList.add('hidden'); addRow(); showTab('editor'); debouncedCalc();
         }
 
-        // FIXED: Enforce accurate descending numeric sort sequence and chronological fallback filtering across all mismatched index variants
         function renderDashboard() {
             const q = (document.getElementById('dash-search').value || "").toLowerCase();
             let rev = 0, qTot = 0; 
             
-            // Build safe runtime map collection array with key definitions preserved
             const processedList = Object.keys(db.docs).map(key => {
                 let item = db.docs[key];
                 return {
@@ -564,7 +590,6 @@
             document.getElementById('stat-rev').innerText = fmt(rev); 
             document.getElementById('stat-quote').innerText = fmt(qTot);
             
-            // Sort strictly descending by numeric id format value first, then fallback to real calendar date
             processedList.sort((a, b) => {
                 let idA = parseInt(a.id) || 0;
                 let idB = parseInt(b.id) || 0;
@@ -592,7 +617,6 @@
             html2pdf().set(opt).from(document.getElementById('pdf-area')).save();
         }
 
-        // EXPORT TO EXCEL
         function exportToExcel() {
             const docsList = Object.values(db.docs);
             if (docsList.length === 0) return alert("No data records found to export.");
@@ -627,62 +651,16 @@
             rdb.ref('autotech_data/inventory').set(updated).then(() => cancelInvEdit());
         }
 
-        function renderInventoryList() {
-            const q = (document.getElementById('inv-search').value || "").toLowerCase();
-            let list = db.inventory.map((item, originalIdx) => ({...item, originalIdx})).sort((a,b) => a.name.localeCompare(b.name));
-            if(q) list = list.filter(i => i.name.toLowerCase().includes(q));
-            document.getElementById('inventory-list').innerHTML = list.map(item => `<tr class="hover:bg-slate-800 text-white"><td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td><td class="p-4 font-black">${fmt(item.price)}</td><td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td></tr>`).join('');
-        }
+        document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) debouncedCalc(); });
+        window.onclick = (e) => { if(!e.target.closest('.relative')) document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
+        function renderInventoryList() { const q = (document.getElementById('inv-search').value || "").toLowerCase(); let list = db.inventory.map((item, originalIdx) => ({...item, originalIdx})).sort((a,b) => a.name.localeCompare(b.name)); if(q) list = list.filter(i => i.name.toLowerCase().includes(q)); document.getElementById('inventory-list').innerHTML = list.map(item => `<tr class="hover:bg-slate-800 text-white"><td class="p-4"><b class="text-sm uppercase text-red-500">${item.name}</b><br><span class="text-slate-400 text-[10px]">${item.desc}</span></td><td class="p-4 font-black">${fmt(item.price)}</td><td class="p-4 text-center space-x-3"><button onclick="editInv(${item.originalIdx})" class="text-emerald-500 font-bold uppercase text-[10px]">Edit</button><button onclick="deleteInv(${item.originalIdx})" class="text-red-500 font-bold uppercase text-[10px]">Delete</button></td></tr>`).join(''); }
         function editInv(idx) { const i = db.inventory[idx]; document.getElementById('inv-edit-idx').value = idx; document.getElementById('inv-name').value = i.name; document.getElementById('inv-desc').value = i.desc.replace(/<br>/g, '\n'); document.getElementById('inv-price').value = i.price; document.getElementById('inv-form-title').innerText = "Edit Item"; document.getElementById('inv-save-btn').innerText = "Update"; document.getElementById('inv-cancel-btn').classList.remove('hidden'); }
         function cancelInvEdit() { document.getElementById('inv-edit-idx').value = "-1"; document.getElementById('inv-name').value = ''; document.getElementById('inv-desc').value = ''; document.getElementById('inv-price').value = ''; document.getElementById('inv-form-title').innerText = "Service Database"; document.getElementById('inv-save-btn').innerText = "Save Item"; document.getElementById('inv-cancel-btn').classList.add('hidden'); }
         function deleteInv(idx) { if(confirm("Delete?")) { const updated = db.inventory.filter((_, i) => i !== idx); rdb.ref('autotech_data/inventory').set(updated); } }
 
-        // SETTINGS & MULTI-CHANNEL INTENT BACKUP
-        function saveSettings() { 
-            const s = { 
-                n1: document.getElementById('set-n1').value, 
-                slogan: document.getElementById('set-slogan').value, 
-                addr: document.getElementById('set-addr').value, 
-                ph: document.getElementById('set-ph').value, 
-                driveEmail: document.getElementById('set-drive-email').value,
-                gatewayUrl: document.getElementById('set-gateway-url').value.trim(),
-                lastDriveSync: db.settings.lastDriveSync || "",
-                logo: curLogo 
-            }; 
-            rdb.ref('autotech_data/settings').set(s).then(() => alert("Workshop Setup Saved")); 
-        }
-        
-        function applySettings() {
-            const s = db.settings || {}; 
-            document.getElementById('brand-1-display').innerText = s.n1 || 'ADVANCED AUTO';
-            document.getElementById('brand-slogan-display').innerText = s.slogan || ''; 
-            document.getElementById('brand-addr-display').innerText = s.addr || '';
-            document.getElementById('brand-contact-display').innerText = s.ph || '';
-            if(s.logo) { document.getElementById('logo-img-display').src = s.logo; document.getElementById('logo-img-display').classList.remove('hidden'); curLogo = s.logo; }
-            
-            document.getElementById('set-n1').value = s.n1 || ''; 
-            document.getElementById('set-slogan').value = s.slogan || ''; 
-            document.getElementById('set-addr').value = s.addr || ''; 
-            document.getElementById('set-ph').value = s.ph || '';
-            document.getElementById('set-drive-email').value = s.driveEmail || '';
-            document.getElementById('set-gateway-url').value = s.gatewayUrl || '';
-
-            // Update configuration UI status labels
-            if(s.gatewayUrl) {
-                document.getElementById('lbl-last-sync').innerText = s.lastDriveSync ? s.lastDriveSync : "Never Executed";
-                if(s.lastDriveSync) {
-                    let parts = s.lastDriveSync.split(' ')[0].split('/');
-                    let nextCheck = new Date(parts[2], parts[1]-1, parts[0]);
-                    nextCheck.setDate(nextCheck.getDate() + 7);
-                    document.getElementById('lbl-next-sync').innerText = nextCheck.toLocaleDateString('en-GB') + " (Automatic)";
-                } else {
-                    document.getElementById('lbl-next-sync').innerText = "On next dashboard load";
-                }
-            } else {
-                document.getElementById('lbl-next-sync').innerText = "Awaiting Setup Gateway URL";
-                document.getElementById('lbl-last-sync').innerText = "Unconfigured";
-            }
-        }
+        // SETTINGS & BACKUP ENGINE
+        function saveSettings() { const s = { n1: document.getElementById('set-n1').value, slogan: document.getElementById('set-slogan').value, addr: document.getElementById('set-addr').value, ph: document.getElementById('set-ph').value, driveEmail: document.getElementById('set-drive-email').value, gatewayUrl: document.getElementById('set-gateway-url').value.trim(), lastDriveSync: db.settings.lastDriveSync || "", logo: curLogo }; rdb.ref('autotech_data/settings').set(s).then(() => alert("Workshop Setup Saved")); }
+        function applySettings() { const s = db.settings || {}; document.getElementById('brand-1-display').innerText = s.n1 || 'ADVANCED AUTO'; document.getElementById('brand-slogan-display').innerText = s.slogan || ''; document.getElementById('brand-addr-display').innerText = s.addr || ''; document.getElementById('brand-contact-display').innerText = s.ph || ''; if(s.logo) { document.getElementById('logo-img-display').src = s.logo; document.getElementById('logo-img-display').classList.remove('hidden'); curLogo = s.logo; } document.getElementById('set-n1').value = s.n1 || ''; document.getElementById('set-slogan').value = s.slogan || ''; document.getElementById('set-addr').value = s.addr || ''; document.getElementById('set-ph').value = s.ph || ''; document.getElementById('set-drive-email').value = s.driveEmail || ''; document.getElementById('set-gateway-url').value = s.gatewayUrl || ''; if(s.gatewayUrl) { document.getElementById('lbl-last-sync').innerText = s.lastDriveSync ? s.lastDriveSync : "Never Executed"; if(s.lastDriveSync) { let parts = s.lastDriveSync.split(' ')[0].split('/'); let nextCheck = new Date(parts[2], parts[1]-1, parts[0]); nextCheck.setDate(nextCheck.getDate() + 7); document.getElementById('lbl-next-sync').innerText = nextCheck.toLocaleDateString('en-GB') + " (Automatic)"; } else { document.getElementById('lbl-next-sync').innerText = "On next dashboard load"; } } else { document.getElementById('lbl-next-sync').innerText = "Awaiting Setup Gateway URL"; document.getElementById('lbl-last-sync').innerText = "Unconfigured"; } }
         function handleLogoUpload(input) { const reader = new FileReader(); reader.onload = (e) => { curLogo = e.target.result; applySettings(); }; if(input.files[0]) reader.readAsDataURL(input.files[0]); }
 
         // PAYMENTS
@@ -690,106 +668,11 @@
         function addPayment() { const v = parseFloat(document.getElementById('pay-val').value) || 0; if(v > 0) { activePays.push({ amt: v, date: document.getElementById('pay-date').value.split('-').reverse().join('/'), method: document.getElementById('pay-method').value }); document.getElementById('pay-val').value = ''; renderPayHistory(); debouncedCalc(); } }
         function renderPayHistory() { document.getElementById('modal-payment-list').innerHTML = activePays.map((p, idx) => `<div class="flex justify-between bg-slate-50 p-2 rounded mb-1 text-slate-900"><span>${p.date} (${p.method})</span><b>${fmt(p.amt)}</b><button onclick="activePays.splice(${idx},1);renderPayHistory();debouncedCalc()">✕</button></div>`).join(''); }
 
-        // AUTOMATED WEEKLY DRIVE SYNC ENGINE
-        function checkAndRunWeeklyBackup() {
-            const s = db.settings || {};
-            if (!s.gatewayUrl) return; 
-
-            let shouldSync = false;
-            if (!s.lastDriveSync) {
-                shouldSync = true;
-            } else {
-                let parts = s.lastDriveSync.split(' ')[0].split('/');
-                let lastDate = new Date(parts[2], parts[1]-1, parts[0]);
-                let contextToday = new Date();
-                
-                let daysSinceLastBackup = Math.floor((contextToday - lastDate) / (1000 * 60 * 60 * 24));
-                if (daysSinceLastBackup >= 7) {
-                    shouldSync = true;
-                }
-            }
-
-            if (shouldSync) {
-                executeDriveTransmission(false);
-            }
-        }
-
-        function forceManualDriveBackup() {
-            if (!db.settings.gatewayUrl) {
-                alert("Please add your deployment Google Script Gateway URL in the text field above first.");
-                return;
-            }
-            executeDriveTransmission(true);
-        }
-
-        function executeDriveTransmission(isManualTrigger) {
-            const targetUrl = db.settings.gatewayUrl;
-            const banner = document.getElementById('backup-banner');
-            const txtStatus = document.getElementById('backup-status');
-
-            if(banner) {
-                banner.classList.remove('hidden');
-                txtStatus.innerText = "Processing Data Transfer...";
-                txtStatus.className = "text-amber-400 animate-pulse";
-            }
-
-            fetch(targetUrl, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain" }, // Keeps it simple and clean for cross-origin transmission
-                body: JSON.stringify(db)
-            })
-            .then(res => {
-                if (!res.ok) throw new Error("HTTP status check rejected: " + res.status);
-                return res.json();
-            })
-            .then((data) => {
-                if (data.status === "error") throw new Error(data.message);
-                
-                const logTimestamp = new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'});
-                rdb.ref('autotech_data/settings/lastDriveSync').set(logTimestamp);
-                
-                if(banner) {
-                    txtStatus.innerText = "Success ✓";
-                    txtStatus.className = "text-emerald-400 font-black";
-                    setTimeout(() => banner.classList.add('hidden'), 4000);
-                }
-                if(isManualTrigger) alert("🎉 Workshop Backup successfully transmitted directly to Google Drive!");
-            })
-            .catch((err) => {
-                if(banner) {
-                    txtStatus.innerText = "Failed ✕";
-                    txtStatus.className = "text-red-400 font-black";
-                }
-                console.error("Backup Engine Error Details: ", err);
-                if(isManualTrigger) alert("Sync Transmission Failed.\n\nError: " + err.message + "\n\nVerify that your script deployment is configured with 'Who has access: Anyone' and that you have authorized permissions.");
-            });
-        }
-
-        // RESTORE CONTROLLER
-        function restoreBackupFromFile(inputElement) {
-            const file = inputElement.files[0];
-            if (!file) return;
-            if (!confirm("CRITICAL WARNING:\n\nYou are about to overwrite your active workshop database. Proceed?")) {
-                inputElement.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const parsedData = JSON.parse(e.target.result);
-                    const restorationPayload = { docs: parsedData.docs || {}, settings: parsedData.settings || {}, inventory: parsedData.inventory || [], clientNotes: parsedData.clientNotes || {}, clientPhones: parsedData.clientPhones || {} };
-                    rdb.ref('autotech_data').set(restorationPayload, (error) => {
-                        if (error) alert("Database update rejected: " + error.message);
-                        else { alert("🎉 Master workspace data has been fully restored."); showTab('dash'); }
-                    });
-                } catch (err) { alert("Restoration Failed: Invalid JSON structure."); }
-                inputElement.value = '';
-            };
-            reader.readAsText(file);
-        }
-
-        document.addEventListener('input', e => { if(e.target.hasAttribute('contenteditable')) debouncedCalc(); });
-        window.onclick = (e) => { if(!e.target.closest('.relative')) document.querySelectorAll('.suggestion-box').forEach(b => b.classList.add('hidden')); }
+        // DRIVE CLOUD AUTO-SYNC SYNC ENGINE
+        function checkAndRunWeeklyBackup() { const s = db.settings || {}; if (!s.gatewayUrl) return; let shouldSync = false; if (!s.lastDriveSync) { shouldSync = true; } else { let parts = s.lastDriveSync.split(' ')[0].split('/'); let lastDate = new Date(parts[2], parts[1]-1, parts[0]); let contextToday = new Date(); let daysSinceLastBackup = Math.floor((contextToday - lastDate) / (1000 * 60 * 60 * 24)); if (daysSinceLastBackup >= 7) shouldSync = true; } if (shouldSync) executeDriveTransmission(false); }
+        function forceManualDriveBackup() { if (!db.settings.gatewayUrl) { alert("Please add your deployment Google Script Gateway URL in the text field above first."); return; } executeDriveTransmission(true); }
+        function executeDriveTransmission(isManualTrigger) { const targetUrl = db.settings.gatewayUrl; const banner = document.getElementById('backup-banner'); const txtStatus = document.getElementById('backup-status'); if(banner) { banner.classList.remove('hidden'); txtStatus.innerText = "Processing Data Transfer..."; txtStatus.className = "text-amber-400 animate-pulse"; } fetch(targetUrl, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(db) }).then(res => { if (!res.ok) throw new Error("HTTP status check rejected: " + res.status); return res.json(); }).then((data) => { if (data.status === "error") throw new Error(data.message); const logTimestamp = new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}); rdb.ref('autotech_data/settings/lastDriveSync').set(logTimestamp); if(banner) { txtStatus.innerText = "Success ✓"; txtStatus.className = "text-emerald-400 font-black"; setTimeout(() => banner.classList.add('hidden'), 4000); } if(isManualTrigger) alert("🎉 Workshop Backup successfully transmitted directly to Google Drive!"); }).catch((err) => { if(banner) { txtStatus.innerText = "Failed ✕"; txtStatus.className = "text-red-400 font-black"; } console.error("Backup Engine Error Details: ", err); if(isManualTrigger) alert("Sync Transmission Failed.\n\nError: " + err.message); }); }
+        function restoreBackupFromFile(inputElement) { const file = inputElement.files[0]; if (!file) return; if (!confirm("CRITICAL WARNING:\n\nYou are about to overwrite your active workshop database. Proceed?")) { inputElement.value = ''; return; } const reader = new FileReader(); reader.onload = function(e) { try { const parsedData = JSON.parse(e.target.result); const restorationPayload = { docs: parsedData.docs || {}, settings: parsedData.settings || {}, inventory: parsedData.inventory || [], clientNotes: parsedData.clientNotes || {}, clientPhones: parsedData.clientPhones || {} }; rdb.ref('autotech_data').set(restorationPayload, (error) => { if (error) alert("Database update rejected: " + error.message); else { alert("🎉 Master workspace data has been fully restored."); showTab('dash'); } }); } catch (err) { alert("Restoration Failed: Invalid JSON structure."); } inputElement.value = ''; }; reader.readAsText(file); }
     </script>
 </body>
 </html>

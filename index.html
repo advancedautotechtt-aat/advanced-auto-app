@@ -10,6 +10,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         :root { --brand-red: #BE1E2D; }
@@ -25,12 +26,13 @@
             .sidebar { display: none; }
             .mobile-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: #0f172a; border-top: 1px solid #334155; z-index: 1000; height: 65px; justify-content: space-around; align-items: center; }
             .main-content { padding-bottom: 80px; }
-            #view-dash, #view-clients { overflow-y: auto; height: 100%; -webkit-overflow-scrolling: touch; }
+            #view-dash, #view-clients, #view-analytics { overflow-y: auto; height: 100%; -webkit-overflow-scrolling: touch; }
             .pdf-wrap { display: flex; justify-content: center; width: 100%; overflow-x: hidden; padding-top: 10px; }
             #pdf-area { transform: scale(0.42); transform-origin: top center; margin-bottom: -550px; flex-shrink: 0; }
         }
 
-        .nav-btn { padding: 18px 25px; cursor: pointer; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-left: 4px solid transparent; }
+        .nav-btn { padding: 18px 25px; cursor: pointer; font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; border-left: 4px solid transparent; transition: all 0.2s; }
+        .nav-btn:hover { background: #1e293b; color: white; }
         .nav-btn.active { background: #1e293b; color: white; border-left-color: var(--brand-red); }
         .main-content { flex-grow: 1; overflow-y: auto; background: #1e293b; scroll-behavior: smooth; }
 
@@ -39,6 +41,7 @@
         .pdf-table th { background: #0f172a; color: white; font-size: 10px; padding: 12px 8px; text-transform: uppercase; }
         .pdf-table td { padding: 12px 8px; border-bottom: 1px solid #cbd5e1; font-size: 12px; vertical-align: top; word-wrap: break-word; line-height: 1.4; color: #000; transition: padding 0.2s ease; }
         
+        .pdf-table tr { page-break-inside: avoid; break-inside: avoid; }
         .avoid-break { page-break-inside: avoid; break-inside: avoid; }
 
         .html2pdf__container #pdf-area { min-height: auto !important; padding: 30px !important; }
@@ -53,6 +56,11 @@
         .modal.active { display: flex; }
         .badge-quote { background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
         .badge-inv { background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 900; }
+        
+        /* New custom styling styles for comparison widgets */
+        .trend-positive { color: #34d399; font-weight: bold; }
+        .trend-negative { color: #f87171; font-weight: bold; }
+        .trend-neutral { color: #94a3b8; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -63,6 +71,7 @@
         <div onclick="initNewDoc()" class="nav-btn">➕ New Job</div>
         <div onclick="showTab('clients')" class="nav-btn" id="tab-clients">👥 Fleet Directory</div>
         <div onclick="showTab('inventory')" class="nav-btn" id="tab-inventory">📦 Service DB</div>
+        <div onclick="openAdminAnalytics()" class="nav-btn" id="tab-analytics">👑 Revenue Analytics</div>
         <div onclick="showTab('settings')" class="nav-btn" id="tab-settings">⚙️ Settings</div>
     </div>
 
@@ -71,20 +80,11 @@
         <div onclick="initNewDoc()" class="text-center text-[10px] font-bold text-slate-400">➕<br>New</div>
         <div onclick="showTab('clients')" class="text-center text-[10px] font-bold text-slate-400">👥<br>Fleet</div>
         <div onclick="showTab('inventory')" class="text-center text-[10px] font-bold text-slate-400">📦<br>DB</div>
+        <div onclick="openAdminAnalytics()" class="text-center text-[10px] font-bold text-slate-400">👑<br>Admin</div>
     </div>
 
     <div class="main-content">
         <div id="view-dash" class="p-4 md:p-10 max-w-6xl mx-auto h-full">
-             <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-slate-900 p-6 rounded-3xl border-l-4 border-emerald-500 shadow-xl">
-                    <p class="text-[10px] font-black text-slate-500 uppercase">Revenue</p>
-                    <h3 id="stat-rev" class="text-2xl font-black text-white">$0.00</h3>
-                </div>
-                <div class="bg-slate-900 p-6 rounded-3xl border-l-4 border-amber-500 shadow-xl">
-                    <p class="text-[10px] font-black text-slate-500 uppercase">Quotes</p>
-                    <h3 id="stat-quote" class="text-2xl font-black text-white">$0.00</h3>
-                </div>
-            </div>
             <div id="backup-banner" class="hidden mb-6 bg-blue-900 border border-blue-700 text-blue-200 text-xs px-6 py-4 rounded-2xl flex items-center justify-between font-bold">
                 <span>⏳ Running scheduled weekly Google Drive backup...</span>
                 <span id="backup-status" class="text-amber-400">Syncing</span>
@@ -221,6 +221,140 @@
                 </table>
             </div>
         </div>
+        
+        <div id="view-analytics" class="hidden p-4 md:p-10 max-w-7xl mx-auto space-y-8">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-2xl font-black uppercase text-white italic">Executive Analytics</h2>
+                        <span class="bg-red-600/20 text-red-500 font-black text-[9px] px-3 py-1 rounded-full uppercase">Admin Only</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Workshop performance metrics, trends & period comparison</p>
+                </div>
+        
+                <div class="flex flex-wrap items-center gap-3">
+                    <select id="analytics-mode" onchange="toggleAnalyticsMode()" class="bg-slate-800 text-white font-black text-xs p-3 rounded-xl outline-none border border-slate-700 uppercase">
+                        <option value="lifetime">Lifetime</option>
+                        <option value="this-month">This Month</option>
+                        <option value="last-month">Last Month</option>
+                        <option value="quarter">This Quarter</option>
+                        <option value="ytd">Year-to-Date (YTD)</option>
+                        <option value="custom">Custom Date Range</option>
+                        <option value="compare">Compare Two Months</option>
+                    </select>
+        
+                    <div id="custom-range-inputs" class="hidden flex items-center gap-2">
+                        <input type="date" id="ana-start" class="bg-slate-800 border border-slate-700 text-xs text-white p-2.5 rounded-xl">
+                        <span class="text-xs text-slate-500">to</span>
+                        <input type="date" id="ana-end" class="bg-slate-800 border border-slate-700 text-xs text-white p-2.5 rounded-xl">
+                    </div>
+        
+                    <!-- Manual month selection dropdowns for precise month-over-month comparisons -->
+                    <div id="compare-inputs" class="hidden flex items-center gap-2">
+                        <select id="ana-month-1" class="month-dropdown bg-slate-800 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none"></select>
+                        <span class="text-xs text-slate-500 font-bold">vs</span>
+                        <select id="ana-month-2" class="month-dropdown bg-slate-800 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none"></select>
+                    </div>
+        
+                    <button onclick="runAnalytics()" class="bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase px-5 py-3 rounded-xl transition-all">
+                        🔄 Run Report
+                    </button>
+                </div>
+            </div>
+        
+            <!-- Secure Lifetime Revenue Widget relocated inside Executive Analytics -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl border-l-4 border-l-amber-500">
+                    <p class="text-[10px] font-black text-slate-500 uppercase">Lifetime Revenue Secure Vault</p>
+                    <h3 id="kpi-lifetime-revenue" class="text-3xl font-black text-amber-400 mt-1">$0.00</h3>
+                    <p class="text-[9px] font-bold text-slate-500 mt-1">Total accumulated workshop revenue across all recorded invoices</p>
+                </div>
+                <div id="compare-results-card" class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl border-l-4 border-l-blue-500 hidden">
+                    <p class="text-[10px] font-black text-slate-500 uppercase">Side-by-Side Comparison Totals</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <div>
+                            <span id="lbl-compare-m1" class="text-xs text-slate-400 block font-bold">Month 1</span>
+                            <span id="val-compare-m1" class="text-lg font-black text-white">$0.00</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-xs text-slate-500 block font-bold">Variance</span>
+                            <span id="val-compare-trend" class="text-sm font-black text-emerald-400">0%</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="lbl-compare-m2" class="text-xs text-slate-400 block font-bold">Month 2</span>
+                            <span id="val-compare-m2" class="text-lg font-black text-white">$0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl border-l-4 border-l-blue-500">
+                    <p class="text-[9px] font-black text-slate-500 uppercase">Total Invoices</p>
+                    <h3 id="kpi-invoices-count" class="text-xl font-black text-blue-400 mt-1">0</h3>
+                    <p id="kpi-invoices-total" class="text-[9px] font-bold text-slate-400 mt-1">Total: $0.00</p>
+                </div>
+                <div class="bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl">
+                    <p class="text-[9px] font-black text-slate-500 uppercase">Avg Invoice (AOV)</p>
+                    <h3 id="kpi-aov" class="text-xl font-black text-blue-400 mt-1">$0.00</h3>
+                    <p class="text-[9px] font-bold text-slate-500 mt-1">Per Completed Job</p>
+                </div>
+                <div class="bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl">
+                    <p class="text-[9px] font-black text-slate-500 uppercase">Quote Conv. Rate</p>
+                    <h3 id="kpi-conv" class="text-xl font-black text-purple-400 mt-1">0%</h3>
+                    <p class="text-[9px] font-bold text-slate-500 mt-1">Quotes ➔ Invoices</p>
+                </div>
+            </div>
+        
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h4 class="text-xs font-black uppercase text-white tracking-wider">Revenue Breakdown & Comparison</h4>
+                            <p id="trend-direction-indicator" class="text-[10px] font-bold mt-1 text-slate-400"></p>
+                        </div>
+                        <div id="chart-legend-badge" class="text-[10px] font-bold text-slate-400 bg-slate-800 px-3 py-1 rounded-lg">Daily Track</div>
+                    </div>
+                    <div class="relative h-72 w-full">
+                        <canvas id="canvas-revenue-trend"></canvas>
+                    </div>
+                </div>
+        
+                <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col justify-between">
+                    <h4 class="text-xs font-black uppercase text-white tracking-wider mb-4">Payment Methods Collected</h4>
+                    <div class="relative h-56 w-full flex items-center justify-center">
+                        <canvas id="canvas-pay-methods"></canvas>
+                    </div>
+                    <div id="pay-method-summary" class="grid grid-cols-3 gap-2 text-center pt-4 border-t border-slate-800 text-[10px] font-bold"></div>
+                </div>
+            </div>
+        
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                    <h4 class="text-xs font-black uppercase text-red-500 tracking-wider mb-4">🔥 Top 5 Revenue Services & Parts</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800 text-slate-500 font-black uppercase">
+                                <tr><th class="p-3">Item / Service Description</th><th class="p-3 text-center">Qty Sold</th><th class="p-3 text-right">Total Revenue</th></tr>
+                            </thead>
+                            <tbody id="tbl-top-items" class="divide-y divide-slate-800 text-white font-bold"></tbody>
+                        </table>
+                    </div>
+                </div>
+        
+                <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800 shadow-xl">
+                    <h4 class="text-xs font-black uppercase text-emerald-400 tracking-wider mb-4">🏆 Top Spend Clients (Selected Period)</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-800 text-slate-500 font-black uppercase">
+                                <tr><th class="p-3">Client Name</th><th class="p-3 text-center">Invoices</th><th class="p-3 text-right">Total Bill</th></tr>
+                            </thead>
+                            <tbody id="tbl-top-clients" class="divide-y divide-slate-800 text-white font-bold"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div id="view-settings" class="hidden max-w-2xl mx-auto p-4 md:p-10">
             <div class="bg-slate-900 p-6 rounded-3xl space-y-4 shadow-xl">
@@ -282,6 +416,22 @@
 
     <div id="pay-modal" class="modal"><div class="bg-white text-slate-900 p-6 rounded-3xl w-full max-w-xs"><h3 class="font-black uppercase text-center mb-4 text-slate-400">Post Payment</h3><div id="modal-payment-list" class="mb-4 space-y-2 max-h-32 overflow-y-auto border-b pb-2 text-[10px]"></div><div class="space-y-3"><input type="date" id="pay-date" class="w-full border p-3 rounded-xl font-bold bg-slate-50"><input type="number" id="pay-val" placeholder="Amount" class="w-full border p-3 rounded-xl font-black bg-slate-50"><select id="pay-method" class="w-full border p-3 rounded-xl font-black bg-slate-50"><option value="Cash">CASH</option><option value="Card">CARD</option><option value="Cheque">CHEQUE</option></select><button onclick="addPayment()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase">Add Payment</button><button onclick="closeModal('pay-modal')" class="w-full text-slate-400 text-[10px] font-black uppercase pt-2">Close</button></div></div></div>
 
+    <div id="admin-pin-modal" class="modal">
+        <div class="bg-slate-900 border border-slate-700 p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl">
+            <div class="text-3xl mb-2">🔒</div>
+            <h3 class="text-lg font-black uppercase text-white tracking-wide">Admin Authentication</h3>
+            <p class="text-xs text-slate-400 mb-6">Enter your 4-digit PIN to access revenue reports.</p>
+            
+            <input type="password" id="admin-pin-input" maxlength="6" placeholder="• • • •" 
+                class="w-full text-center text-2xl font-black tracking-widest bg-slate-800 border border-slate-700 text-white p-4 rounded-2xl outline-none focus:border-red-600 mb-4">
+            
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="verifyAdminPIN()" class="bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs py-4 rounded-xl transition-all">Unlock</button>
+                <button onclick="closeModal('admin-pin-modal')" class="bg-slate-800 text-slate-400 font-black uppercase text-xs py-4 rounded-xl">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const firebaseConfig = { apiKey: "AIzaSyDmBG5zcJFfZW_oeDaAtnO09amq-BycRCk", authDomain: "autotech-pro.firebaseapp.com", databaseURL: "https://autotech-pro-default-rtdb.firebaseio.com", projectId: "autotech-pro", storageBucket: "autotech-pro.firebasestorage.app", messagingSenderId: "565284746994", appId: "1:565284746994:web:5d62fe269d4d6a038e826b" };
         firebase.initializeApp(firebaseConfig);
@@ -293,6 +443,10 @@
         let currentClientViewing = "";
         let calcTimeout = null;
         let currentEditingId = null; 
+        
+        let isAdminAuthenticated = false;
+        let revChartInstance = null;
+        let payChartInstance = null;
 
         rdb.ref('autotech_data').on('value', (snap) => {
             const val = snap.val() || {};
@@ -301,7 +455,7 @@
             db.inventory = val.inventory || [];
             db.clientNotes = val.clientNotes || {};
             db.clientPhones = val.clientPhones || {};
-            applySettings(); renderDashboard(); renderClients(); renderInventoryList();
+            applySettings(); renderDashboard(); renderClients(); renderInventoryList(); populateComparisonDropdowns();
             checkAndRunWeeklyBackup();
         });
 
@@ -366,7 +520,7 @@
             if (uniqueEntries.size > 0) {
                 box.innerHTML = Array.from(uniqueEntries.values()).map(m => {
                     let displayTitle = type === 'client' ? m.client : m.reg;
-                    let displaySub = type === 'client' ? `${m.reg} — ${m.model}` : `${m.client} — ${m.model}`;
+                    let displaySub = type === 'client' ? `${m.reg} —${m.model}` : `${m.client} —${m.model}`;
                     
                     return `
                     <div class="p-3 border-b cursor-pointer text-slate-900 hover:bg-slate-100" onclick="applyAutofill('${m.id}', '${type}', '')">
@@ -578,7 +732,6 @@
 
         function renderDashboard() {
             const q = (document.getElementById('dash-search').value || "").toLowerCase();
-            let rev = 0, qTot = 0; 
             
             const processedList = Object.keys(db.docs).map(key => {
                 let item = db.docs[key];
@@ -592,14 +745,6 @@
                     total: item.total || '$0.00'
                 };
             });
-
-            processedList.forEach(i => { 
-                const t = parseFloat(i.total.replace(/[^0-9.-]+/g,"")) || 0; 
-                if(i.type === 'INVOICE') rev += t; 
-                else if(i.type === 'QUOTE') qTot += t; 
-            });
-            document.getElementById('stat-rev').innerText = fmt(rev); 
-            document.getElementById('stat-quote').innerText = fmt(qTot);
             
             processedList.sort((a, b) => {
                 let idA = parseInt(a.id) || 0;
@@ -630,12 +775,19 @@
             btn.style.pointerEvents = "none";
             
             const opt = { 
-                margin: 0, 
+                margin: [30, 0, 30, 0], 
+                pagebreak: { mode: ['css', 'legacy'] },
                 filename: `AdvancedAuto-${document.getElementById('doc-id').innerText}.pdf`, 
                 image: { type: 'jpeg', quality: 1.0 }, 
                 html2canvas: { scale: 2, useCORS: true }, 
                 jsPDF: { unit: 'px', format: [750, 1050] } 
             };
+
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.style.opacity = "1";
+                btn.style.pointerEvents = "auto";
+            }, 4000);
             
             html2pdf().set(opt).from(document.getElementById('pdf-area')).save().then(() => {
                 btn.innerText = originalText;
@@ -716,6 +868,374 @@
         function forceManualDriveBackup() { if (!db.settings.gatewayUrl) { alert("Please add your deployment Google Script Gateway URL in the text field above first."); return; } executeDriveTransmission(true); }
         function executeDriveTransmission(isManualTrigger) { const targetUrl = db.settings.gatewayUrl; const banner = document.getElementById('backup-banner'); const txtStatus = document.getElementById('backup-status'); if(banner) { banner.classList.remove('hidden'); txtStatus.innerText = "Processing Data Transfer..."; txtStatus.className = "text-amber-400 animate-pulse"; } fetch(targetUrl, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify(db) }).then(res => { if (!res.ok) throw new Error("HTTP status check rejected: " + res.status); return res.json(); }).then((data) => { if (data.status === "error") throw new Error(data.message); const logTimestamp = new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}); rdb.ref('autotech_data/settings/lastDriveSync').set(logTimestamp); if(banner) { txtStatus.innerText = "Success ✓"; txtStatus.className = "text-emerald-400 font-black"; setTimeout(() => banner.classList.add('hidden'), 4000); } if(isManualTrigger) alert("🎉 Workshop Backup successfully transmitted directly to Google Drive!"); }).catch((err) => { if(banner) { txtStatus.innerText = "Failed ✕"; txtStatus.className = "text-red-400 font-black"; } console.error("Backup Engine Error Details: ", err); if(isManualTrigger) alert("Sync Transmission Failed.\n\nError: " + err.message); }); }
         function restoreBackupFromFile(inputElement) { const file = inputElement.files[0]; if (!file) return; if (!confirm("CRITICAL WARNING:\n\nYou are about to overwrite your active workshop database. Proceed?")) { inputElement.value = ''; return; } const reader = new FileReader(); reader.onload = function(e) { try { const parsedData = JSON.parse(e.target.result); const restorationPayload = { docs: parsedData.docs || {}, settings: parsedData.settings || {}, inventory: parsedData.inventory || [], clientNotes: parsedData.clientNotes || {}, clientPhones: parsedData.clientPhones || {} }; rdb.ref('autotech_data').set(restorationPayload, (error) => { if (error) alert("Database update rejected: " + error.message); else { alert("🎉 Master workspace data has been fully restored."); showTab('dash'); } }); } catch (err) { alert("Restoration Failed: Invalid JSON structure."); } inputElement.value = ''; }; reader.readAsText(file); }
+
+        function openAdminAnalytics() {
+            if (isAdminAuthenticated) {
+                showTab('analytics');
+                runAnalytics();
+            } else {
+                document.getElementById('admin-pin-input').value = '';
+                document.getElementById('admin-pin-modal').classList.add('active');
+            }
+        }
+
+        function verifyAdminPIN() {
+            const inputPin = document.getElementById('admin-pin-input').value;
+            const currentAdminPin = (db.settings && db.settings.adminPin) ? db.settings.adminPin : "1234";
+            
+            if (inputPin === currentAdminPin) {
+                isAdminAuthenticated = true;
+                closeModal('admin-pin-modal');
+                showTab('analytics');
+                runAnalytics();
+            } else {
+                alert("Incorrect Admin PIN Code");
+            }
+        }
+
+        function toggleAnalyticsMode() {
+            const mode = document.getElementById('analytics-mode').value;
+            document.getElementById('custom-range-inputs').classList.toggle('hidden', mode !== 'custom');
+            document.getElementById('compare-inputs').classList.toggle('hidden', mode !== 'compare');
+            document.getElementById('compare-results-card').classList.toggle('hidden', mode !== 'compare');
+        }
+
+        function populateComparisonDropdowns() {
+            const select1 = document.getElementById("ana-month-1");
+            const select2 = document.getElementById("ana-month-2");
+            if (!select1 || !select2) return;
+
+            // Extract all unique months from database documents
+            const monthSet = new Set();
+            Object.values(db.docs).forEach(d => {
+                if (d && d.date) {
+                    const parsed = parseDate(d.date);
+                    if (!isNaN(parsed.getTime()) && parsed.getFullYear() > 2000) {
+                        const y = parsed.getFullYear();
+                        const m = String(parsed.getMonth() + 1).padStart(2, '0');
+                        monthSet.add(`${y}-${m}`);
+                    }
+                }
+            });
+
+            const months = Array.from(monthSet).sort();
+            if (months.length === 0) {
+                const currentYm = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+                months.push(currentYm);
+            }
+
+            const optionsHtml = months.map(m => {
+                const [y, monthNum] = m.split("-");
+                const dateObj = new Date(y, monthNum - 1);
+                const label = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                return `<option value="${m}">${label}</option>`;
+            }).join('');
+
+            select1.innerHTML = optionsHtml;
+            select2.innerHTML = optionsHtml;
+
+            if (months.length >= 2) {
+                select1.value = months[months.length - 2];
+                select2.value = months[months.length - 1];
+            } else if (months.length === 1) {
+                select1.value = months[0];
+                select2.value = months[0];
+            }
+        }
+
+        function runAnalytics() {
+            const mode = document.getElementById('analytics-mode').value;
+            const now = new Date();
+            let startA, endA, startB, endB;
+            let isComparison = false;
+
+            // Calculate Lifetime Revenue across all records
+            let lifetimeRev = 0;
+            Object.values(db.docs).forEach(d => {
+                if (d && d.type === 'INVOICE') {
+                    lifetimeRev += parseFloat((d.total || "0").replace(/[^0-9.-]+/g, "")) || 0;
+                }
+            });
+            document.getElementById('kpi-lifetime-revenue').innerText = fmt(lifetimeRev);
+
+            if (mode === 'lifetime') {
+                startA = new Date(2000, 0, 1);
+                endA = new Date(2099, 11, 31, 23, 59, 59);
+            } else if (mode === 'this-month') {
+                startA = new Date(now.getFullYear(), now.getMonth(), 1);
+                endA = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            } else if (mode === 'last-month') {
+                startA = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                endA = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            } else if (mode === 'quarter') {
+                const qMonth = Math.floor(now.getMonth() / 3) * 3;
+                startA = new Date(now.getFullYear(), qMonth, 1);
+                endA = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59);
+            } else if (mode === 'ytd') {
+                startA = new Date(now.getFullYear(), 0, 1);
+                endA = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+            } else if (mode === 'custom') {
+                const sVal = document.getElementById('ana-start').value;
+                const eVal = document.getElementById('ana-end').value;
+                startA = sVal ? new Date(sVal) : new Date(now.getFullYear(), now.getMonth(), 1);
+                endA = eVal ? new Date(eVal + 'T23:59:59') : now;
+            } else if (mode === 'compare') {
+                isComparison = true;
+                const m1 = document.getElementById('ana-month-1').value;
+                const m2 = document.getElementById('ana-month-2').value;
+                
+                if (!m1 || !m2) {
+                    startA = new Date(now.getFullYear(), now.getMonth(), 1);
+                    endA = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                    startB = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                    endB = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+                } else {
+                    const [y1, month1] = m1.split('-').map(Number);
+                    startA = new Date(y1, month1 - 1, 1);
+                    endA = new Date(y1, month1, 0, 23, 59, 59);
+
+                    const [y2, month2] = m2.split('-').map(Number);
+                    startB = new Date(y2, month2 - 1, 1);
+                    endB = new Date(y2, month2, 0, 23, 59, 59);
+                }
+            }
+
+            const dataA = processPeriodData(startA, endA);
+            const dataB = isComparison ? processPeriodData(startB, endB) : null;
+
+            if (isComparison && dataB) {
+                document.getElementById('compare-results-card').classList.remove('hidden');
+                const m1Val = document.getElementById('ana-month-1').value;
+                const m2Val = document.getElementById('ana-month-2').value;
+                
+                const formatLabel = (ym) => {
+                    const [y, m] = ym.split('-');
+                    return new Date(y, m - 1).toLocaleString('default', { month: 'short', year: 'numeric' });
+                };
+
+                document.getElementById('lbl-compare-m1').innerText = formatLabel(m1Val);
+                document.getElementById('val-compare-m1').innerText = fmt(dataA.gross);
+                document.getElementById('lbl-compare-m2').innerText = formatLabel(m2Val);
+                document.getElementById('val-compare-m2').innerText = fmt(dataB.gross);
+
+                const diff = dataB.gross - dataA.gross;
+                const pct = dataA.gross > 0 ? ((diff / dataA.gross) * 100).toFixed(1) : (dataB.gross > 0 ? 100 : 0);
+                const trendEl = document.getElementById('val-compare-trend');
+                
+                if (diff > 0) {
+                    trendEl.innerText = `+${pct}\% (+$${diff.toLocaleString()})`;
+                    trendEl.className = "text-sm font-black trend-positive";
+                } else if (diff < 0) {
+                    trendEl.innerText = `${pct}\% (-$${Math.abs(diff).toLocaleString()})`;
+                    trendEl.className = "text-sm font-black trend-negative";
+                } else {
+                    trendEl.innerText = "0.0% (No change)";
+                    trendEl.className = "text-sm font-black trend-neutral";
+                }
+            } else {
+                document.getElementById('compare-results-card').classList.add('hidden');
+            }
+
+            renderKPIScorecards(dataA, dataB, isComparison);
+            renderRevenueChart(dataA, dataB, isComparison, startA, startB);
+            renderPayMethodChart(dataA.payMethods);
+            renderTopBreakdowns(dataA);
+        }
+
+        function processPeriodData(startDate, endDate) {
+            let gross = 0, paid = 0, due = 0, quotesVol = 0, quotesCount = 0, invoicesCount = 0;
+            const payMethods = { Cash: 0, Card: 0, Cheque: 0 };
+            const itemsMap = {};
+            const clientsMap = {};
+            const dailyMap = {};
+
+            Object.values(db.docs).forEach(d => {
+                if (!d.date) return;
+                const docDate = parseDate(d.date);
+                
+                if (docDate >= startDate && docDate <= endDate) {
+                    const tot = parseFloat((d.total || "0").replace(/[^0-9.-]+/g, "")) || 0;
+                    const disc = parseFloat((d.discount || "0").replace(/[^0-9.-]+/g, "")) || 0;
+
+                    if (d.type === 'QUOTE') {
+                        quotesVol += tot;
+                        quotesCount++;
+                    } else if (d.type === 'INVOICE') {
+                        invoicesCount++;
+                        gross += tot;
+
+                        let docPaid = 0;
+                        if (d.payments && Array.isArray(d.payments)) {
+                            d.payments.forEach(p => {
+                                const amt = parseFloat(p.amt) || 0;
+                                docPaid += amt;
+                                const m = p.method || 'Cash';
+                                if (payMethods[m] !== undefined) payMethods[m] += amt;
+                                else payMethods.Cash += amt;
+                            });
+                        }
+                        paid += docPaid;
+                        due += Math.max(0, tot - disc - docPaid);
+
+                        const dayKey = docDate.getDate();
+                        dailyMap[dayKey] = (dailyMap[dayKey] || 0) + tot;
+
+                        const clientName = (d.client || 'UNKNOWN').toUpperCase();
+                        if (!clientsMap[clientName]) clientsMap[clientName] = { invoices: 0, bill: 0 };
+                        clientsMap[clientName].invoices++;
+                        clientsMap[clientName].bill += tot;
+
+                        if (d.rows) {
+                            const tempDiv = document.createElement('tbody');
+                            tempDiv.innerHTML = d.rows;
+                            tempDiv.querySelectorAll('tr').forEach(tr => {
+                                const nameEl = tr.querySelector('.d-name-input');
+                                const qtyEl = tr.querySelector('.q-in');
+                                const priceEl = tr.querySelector('.p-in');
+                                if (nameEl) {
+                                    const itemName = nameEl.innerText.trim().toUpperCase();
+                                    const qty = parseFloat(qtyEl ? qtyEl.innerText : 1) || 1;
+                                    const price = parseFloat(priceEl ? priceEl.innerText.replace(/[^0-9.-]+/g, "") : 0) || 0;
+                                    
+                                    if (itemName && itemName !== 'SERVICE/PART') {
+                                        if (!itemsMap[itemName]) itemsMap[itemName] = { qty: 0, rev: 0 };
+                                        itemsMap[itemName].qty += qty;
+                                        itemsMap[itemName].rev += (price * qty);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+
+            return { gross, paid, due, quotesVol, quotesCount, invoicesCount, payMethods, itemsMap, clientsMap, dailyMap };
+        }
+
+        function renderKPIScorecards(dA, dB, isComparison) {
+            document.getElementById('kpi-invoices-count').innerText = dA.invoicesCount;
+            document.getElementById('kpi-invoices-total').innerText = `Total: ${fmt(dA.gross)}`;
+            
+            const aov = dA.invoicesCount > 0 ? (dA.gross / dA.invoicesCount) : 0;
+            document.getElementById('kpi-aov').innerText = fmt(aov);
+
+            const totalPipeline = dA.invoicesCount + dA.quotesCount;
+            const convRate = totalPipeline > 0 ? Math.round((dA.invoicesCount / totalPipeline) * 100) : 0;
+            document.getElementById('kpi-conv').innerText = `${convRate}%`;
+        }
+
+        function renderRevenueChart(dA, dB, isComparison, dateA, dateB) {
+            const ctx = document.getElementById('canvas-revenue-trend').getContext('2d');
+            if (revChartInstance) revChartInstance.destroy();
+
+            const daysInMonth = 31;
+            const labels = Array.from({ length: daysInMonth }, (_, i) => `Day ${i + 1}`);
+            
+            const seriesA = labels.map((_, i) => dA.dailyMap[i + 1] || 0);
+            const datasets = [{
+                label: isComparison ? (dateA ? dateA.toLocaleString('default', { month: 'short', year: '2-digit' }) : 'Month 1') : 'Revenue ($)',
+                data: seriesA,
+                backgroundColor: '#be1e2d',
+                borderColor: '#be1e2d',
+                borderRadius: 6
+            }];
+
+            const indicatorEl = document.getElementById('trend-direction-indicator');
+
+            if (isComparison && dB) {
+                const seriesB = labels.map((_, i) => dB.dailyMap[i + 1] || 0);
+                datasets.push({
+                    label: dateB ? dateB.toLocaleString('default', { month: 'short', year: '2-digit' }) : 'Month 2',
+                    data: seriesB,
+                    backgroundColor: '#3b82f6',
+                    borderColor: '#3b82f6',
+                    borderRadius: 6
+                });
+
+                const totalA = dA.gross;
+                const totalB = dB.gross;
+                const diff = totalB - totalA;
+                const percentChange = totalA > 0 ? ((diff / totalA) * 100).toFixed(1) : (totalB > 0 ? 100 : 0);
+
+                if (diff > 0) {
+                    indicatorEl.innerHTML = `<span class="text-emerald-400 font-black">📈 Trend went UP by ${fmt(Math.abs(diff))} (+${percentChange}%)</span> in Month 2`;
+                } else if (diff < 0) {
+                    indicatorEl.innerHTML = `<span class="text-red-400 font-black">📉 Trend went DOWN by ${fmt(Math.abs(diff))} (${percentChange}%)</span> in Month 2`;
+                } else {
+                    indicatorEl.innerHTML = `<span class="text-slate-400 font-black">➡️ Trend remained flat (0% change)</span> between selected months`;
+                }
+            } else {
+                indicatorEl.innerHTML = ``;
+            }
+
+            revChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8', font: { weight: 'bold' } } } },
+                    scales: {
+                        x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        }
+
+        function renderPayMethodChart(payMethods) {
+            const ctx = document.getElementById('canvas-pay-methods').getContext('2d');
+            if (payChartInstance) payChartInstance.destroy();
+
+            payChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Cash', 'Card', 'Cheque'],
+                    datasets: [{
+                        data: [payMethods.Cash, payMethods.Card, payMethods.Cheque],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            document.getElementById('pay-method-summary').innerHTML = `
+                <div class="text-emerald-400">💵 Cash<br>${fmt(payMethods.Cash)}</div>
+                <div class="text-blue-400">💳 Card<br>${fmt(payMethods.Card)}</div>
+                <div class="text-amber-400">📜 Cheque<br>${fmt(payMethods.Cheque)}</div>
+            `;
+        }
+
+        function renderTopBreakdowns(dA) {
+            const topItems = Object.entries(dA.itemsMap)
+                .sort((a, b) => b[1].rev - a[1].rev)
+                .slice(0, 5);
+
+            document.getElementById('tbl-top-items').innerHTML = topItems.length > 0 ? topItems.map(([name, stat]) => `
+                <tr>
+                    <td class="p-3 text-white uppercase font-black">${name}</td>
+                    <td class="p-3 text-center text-slate-400">${stat.qty}</td>
+                    <td class="p-3 text-right text-emerald-400 font-black">${fmt(stat.rev)}</td>
+                </tr>
+            `).join('') : `<tr><td colspan="3" class="p-4 text-center text-slate-500">No line items recorded for period</td></tr>`;
+
+            const topClients = Object.entries(dA.clientsMap)
+                .sort((a, b) => b[1].bill - a[1].bill)
+                .slice(0, 5);
+
+            document.getElementById('tbl-top-clients').innerHTML = topClients.length > 0 ? topClients.map(([name, stat]) => `
+                <tr>
+                    <td class="p-3 text-white uppercase font-black">${name}</td>
+                    <td class="p-3 text-center text-slate-400">${stat.invoices}</td>
+                    <td class="p-3 text-right text-emerald-400 font-black">${fmt(stat.bill)}</td>
+                </tr>
+            `).join('') : `<tr><td colspan="3" class="p-4 text-center text-slate-500">No client data for period</td></tr>`;
+        }
     </script>
 </body>
 </html>
